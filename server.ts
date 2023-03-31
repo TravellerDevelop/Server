@@ -2,16 +2,16 @@ import http from "http";
 import url from "url";
 import fs from "fs";
 import dotenv from "dotenv";
-import { MongoClient, ObjectId } from "mongodb";
+import { Collection, MongoClient, ObjectId } from "mongodb";
 import express from "express";
 import cors from "cors";
 
 const PORT = process.env.PORT || 1337;
 dotenv.config({ path: ".env" });
 var app = express();
-const connectionString: any = process.env.connectionString;
-const DBNAME = "MongoDB_Esercizi";
-const collection = "mail";
+const connectionString: any = process.env.connectionStringLocal;
+const DBNAME = "Traveller";
+const collection = "bigData";
 
 const corsOptions = {
   origin: function (origin: any, callback: any) {
@@ -66,69 +66,19 @@ app.use("/api/", (req: any, res: any, next: any) => {
 });
 
 /***********USER LISTENER****************/
-app.get("/api/login/", (req: any, res: any, next: any) => {
-  let db = req.client.db(DBNAME);
-  let email = req.query.email;
-  let password = req.query.password;
-  console.log("----")
-  console.log(email);
-  console.log(password);
-  console.log("----")
-  db.collection(collection).findOne({username : email}, (err: any, data: any) => {
-    if (err) {
-      res.status(500);
-      res.send("Errore Login");
-    } else {
-      if(data.password == password && data.username == email){
-        res.status(200);
-        res.send(data);
-      }else if(data.password != password || data.username != email){
-        res.status(401);
-        res.send("Credenziali non valide");
-      }
-    }
-    req.client.close();
-  })
-});
-
-app.get("/api/verifyDestination/", (req: any, res: any, next: any) => {
-  let email = req.query.to;
-  let db = req.client.db(DBNAME);
-  console.log("----")
-  console.log(email);
-  console.log("----")
-  db.collection(collection).findOne
-  ({username : email}, (err: any, data: any) => {
-    if (err) {
-      res.status(500);
-      res.send("Errore ricerca destinatario");
-    } else {
-      if(data != null){
-        res.status(200);
-        res.send(data);
-      }else{
-        res.status(503);
-        res.send("Utente non trovato");
-      }
-    }
-    req.client.close();
-  })
-});
-
-app.post("/api/insertMail/", (req: any, res: any, next: any) => {
-  let db = req.client.db(DBNAME);
-  let mail = req.body;
-  console.log("----")
-  console.log(mail);
-  console.log("----")
-  db.collection(collection).insertOne(mail, (err: any, data: any) => {
-    if (err) {
-      res.status(500);
-      res.send("Errore inserimento mail");
-    } else {
+app.get("/api/lista", cors(corsOptions), (req: any, res: any) => {
+  let client = req["client"];
+  let db = client.db(DBNAME);
+  let collection = db.collection("users");
+  collection
+    .find({})
+    .toArray()
+    .then((result: any) => {
       res.status(200);
-      res.send("Mail inserita correttamente");
-    }
-    req.client.close();
-  })
+      res.json(result);
+    })
+    .catch((err: any) => {
+      res.status(500);
+      res.send("Errore di lettura da DB");
+    });
 });
