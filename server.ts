@@ -1,24 +1,27 @@
+"use strict";
+
 import http from "http";
 import url from "url";
 import fs from "fs";
+import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
-import { Collection, MongoClient, ObjectId } from "mongodb";
-import express from "express";
-import cors from "cors";
+import express from "express"; // @types/express
+import cors from "cors"; // @types/cors
+import fileUpload, { UploadedFile } from "express-fileupload";
+import { RemoteSocket, Server, Socket } from "socket.io";
+import colors from "colors";
+import { isConstructorDeclaration } from "typescript";
+import sha256 from "fast-sha256";
 
-const PORT = process.env.PORT || 1337;
 dotenv.config({ path: ".env" });
-var app = express();
-const connectionString: any = process.env.connectionStringLocal;
-const DBNAME = "Traveller";
-const collection = "bigData";
 
-const corsOptions = {
-  origin: function (origin: any, callback: any) {
-    return callback(null, true);
-  },
-  credentials: true,
-};
+const app = express();
+const httpServer = http.createServer(app);
+const io = new Server(httpServer);
+const PORT = process.env.PORT || 1337;
+const DB_NAME = "traveller";
+const connectionString: any = process.env.connectionString;
+const socket : any = [];
 
 //CREAZIONE E AVVIO DEL SERVER HTTP
 let server = http.createServer(app);
@@ -41,44 +44,87 @@ function init() {
 }
 
 /***********MIDDLEWARE****************/
-// 1 request log
 app.use("/", (req: any, res: any, next: any) => {
   console.log(req.method + ": " + req.originalUrl);
   next();
 });
 
-//cerca le risorse nella cartella segnata nel path e li restituisce
 app.use("/", express.static("./static"));
 
-// Apertura della connessione
-app.use("/api/", (req: any, res: any, next: any) => {
+app.use("/", express.json({ limit: "50mb" }));
+app.use("/", express.urlencoded({ limit: "50mb", extended: true }));
+
+app.use("/", (req: any, res: any, next: any) => {
+  if (Object.keys(req.query).length != 0) {
+    console.log("------> Parametri GET: " + JSON.stringify(req.query));
+  }
+  if (Object.keys(req.body).length != 0) {
+    console.log("------> Parametri BODY: " + JSON.stringify(req.body));
+  }
+  next();
+});
+
+const whitelist = [];
+const corsOptions = {
+  origin: function (origin: any, callback: any) {
+    return callback(null, true);
+  },
+  credentials: true,
+};
+app.use("/", cors(corsOptions));
+
+app.set("json spaces", 4);
+
+app.use("/api/", function (req: any, res: any, next) {
   let connection = new MongoClient(connectionString);
   connection
     .connect()
-    .catch((err: any) => {
-      res.status(503);
-      res.send("Errore di connessione al DB");
-    })
     .then((client: any) => {
-      req["client"] = client;
+      req["connessione"] = client;
       next();
+    })
+    .catch((err: any) => {
+      let msg = "Errore di connessione al db";
+      res.status(503).send(msg);
     });
 });
 
 /***********USER LISTENER****************/
-app.get("/api/lista", cors(corsOptions), (req: any, res: any) => {
-  let client = req["client"];
-  let db = client.db(DBNAME);
-  let collection = db.collection("users");
-  collection
-    .find({})
-    .toArray()
-    .then((result: any) => {
-      res.status(200);
-      res.json(result);
-    })
-    .catch((err: any) => {
-      res.status(500);
-      res.send("Errore di lettura da DB");
-    });
+app.get("/api/user/info", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("user");
+  let username = req.query.username;
+  console.log(username);
+  collection.find({ username : username }).toArray(function (err: any, data: any) {
+    console.log(data);
+    if (err) {
+      res.status(500).send("Errore esecuzione query");
+    } else {
+      res.send(data);
+    }
+    req["connessione"].close();
+  });
+});
+
+app.post("/api/user/register", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("user");
+  console.log(req.body);
+  collection.insertOne({
+    name: req.body.name,
+    surname: req.body.surname,
+    username: req.body.username,
+    email: req.body.email,
+    password: sha256(req.body.password),
+    friends: [],
+    friends_count: 0,
+    travels: []
+  }, function (err: any, data: any) {
+    if (err) {
+      console.log(err);
+      res.status(500).send("Errore esecuzione query");
+    } else {
+      console.log(data);
+      res.status(200).send(data);
+    }
+    req["connessione"].close();
+  });
 });
