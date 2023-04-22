@@ -1,28 +1,56 @@
-{
-    "id": "WaqmpZwAJK",
-    "name": "Peter",
-    "surname": "Parker",
-    "dbo": "1990-01-01",
-    "country": "USA",
-    "email" : "peterparker@mail.com",
-    "password" : "123456",
-    "friends": [
-        "TSKIGKYUEU",
-        "ajQSOLzXui",
-        "pduhdsuASz",
-        "C9is2DsS4S",
-        "lvFMKDR0ZT",
-        "tHpzYMOcUG",
-        "DxrVciJyBc",
-        "VS95y5222z",
-        "LgFpPWzWVW"
-    ],
-    "friends_count": 9,
-    "travels" : [
-        {"id" : "8I7GZ5lpYQ", "role" : 1},
-        {"id" : "f7c0wv1vmr", "role" : 0},
-        {"id" : "M4Ms9wGl8V", "role" : 0},
-        {"id" : "xOQqXUFnYy", "role" : 1},
-        {"id" : "YtDJoxnh5l", "role" : 0}
-    ]
-}
+[
+    {
+        "name": "Peter",
+        "surname": "Parker",
+        "dbo": "1990-01-01",
+        "country": "USA",
+        "email" : "peterparker@mail.com",
+        "password" : "123456",
+        "friends": [
+            "TSKIGKYUEU",
+            "ajQSOLzXui",
+            "pduhdsuASz",
+            "C9is2DsS4S",
+            "lvFMKDR0ZT",
+            "tHpzYMOcUG",
+            "DxrVciJyBc",
+            "VS95y5222z",
+            "LgFpPWzWVW"
+        ],
+        "friends_count": 9,
+        "travels" : [
+            {"id" : "8I7GZ5lpYQ", "role" : 1},
+            {"id" : "f7c0wv1vmr", "role" : 0},
+            {"id" : "M4Ms9wGl8V", "role" : 0},
+            {"id" : "xOQqXUFnYy", "role" : 1},
+            {"id" : "YtDJoxnh5l", "role" : 0}
+        ]
+    },
+    {
+        "name": "Lewis",
+        "surname": "Hamilton",
+        "dbo": "1981-22-12",
+        "country": "USA",
+        "email" : "lewis.hamilton@mail.com",
+        "password" : "12345678",
+        "friends": [
+            "TSKIGKYUEU",
+            "ajQSOLzXui",
+            "pduhdsuASz",
+            "C9is2DsS4S",
+            "lvFMKDR0ZT",
+            "tHpzYMOcUG",
+            "DxrVciJyBc",
+            "VS95y5222z",
+            "LgFpPWzWVW"
+        ],
+        "friends_count": 9,
+        "travels" : [
+            {"id" : "8I7GZ5lpYQ", "role" : 1},
+            {"id" : "f7c0wv1vmr", "role" : 0},
+            {"id" : "M4Ms9wGl8V", "role" : 0},
+            {"id" : "xOQqXUFnYy", "role" : 1},
+            {"id" : "YtDJoxnh5l", "role" : 0}
+        ]
+    }
+]
