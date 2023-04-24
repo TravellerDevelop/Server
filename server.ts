@@ -11,7 +11,6 @@ import fileUpload, { UploadedFile } from "express-fileupload";
 import { RemoteSocket, Server, Socket } from "socket.io";
 import colors from "colors";
 import { isConstructorDeclaration } from "typescript";
-import sha256 from "fast-sha256";
 
 dotenv.config({ path: ".env" });
 
@@ -21,7 +20,7 @@ const io = new Server(httpServer);
 const PORT = process.env.PORT || 1337;
 const DB_NAME = "traveller";
 const connectionString: any = process.env.connectionString;
-const socket : any = [];
+const socket: any = [];
 
 //CREAZIONE E AVVIO DEL SERVER HTTP
 let server = http.createServer(app);
@@ -90,11 +89,15 @@ app.use("/api/", function (req: any, res: any, next) {
 });
 
 /***********USER LISTENER****************/
+app.post("/api/verifyConnection", function (req: any, res: any, next) {
+  res.status(200).send("Connected");
+});
+
 app.get("/api/user/info", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("user");
   let username = req.query.username;
   console.log(username);
-  collection.find({ username : username }).toArray(function (err: any, data: any) {
+  collection.find({ username: username }).toArray(function (err: any, data: any) {
     console.log(data);
     if (err) {
       res.status(500).send("Errore esecuzione query");
@@ -113,7 +116,7 @@ app.post("/api/user/register", function (req: any, res: any, next) {
     surname: req.body.surname,
     username: req.body.username,
     email: req.body.email,
-    password: sha256(req.body.password),
+    password: req.body.password,
     friends: [],
     friends_count: 0,
     travels: []
@@ -124,6 +127,31 @@ app.post("/api/user/register", function (req: any, res: any, next) {
     } else {
       console.log(data);
       res.status(200).send(data);
+    }
+    req["connessione"].close();
+  });
+});
+
+app.post("/api/user/login", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("user");
+  console.log(req.body);
+  collection.find({ username: req.body.username }).toArray(function (err: any, data: any) {
+    if (err) {
+      console.log(err);
+      res.status(500).send("Errore esecuzione query");
+    } else {
+      if(data.length == 0){
+        console.log("Utente non trovato")
+        res.status(202).send("Utente non trovato");
+      }else{
+        if(data[0].password == req.body.password){
+          res.status(200).send(data);
+        }else{
+          console.log("Password errata")
+          res.status(201).send("Password errata");
+        }
+      }
+
     }
     req["connessione"].close();
   });
