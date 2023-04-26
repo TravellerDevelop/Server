@@ -89,8 +89,18 @@ app.use("/api/", function (req: any, res: any, next) {
 });
 
 /***********USER LISTENER****************/
-app.post("/api/verifyConnection", function (req: any, res: any, next) {
-  res.status(200).send("Connected");
+app.get("/api/verifyConnection", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("test");
+  collection.find({}).toArray(function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore nella connessione al database");
+    } else {
+      if(data.length != 0){
+        res.status(200).send("Ok");
+      }
+    }
+    req["connessione"].close();
+  });
 });
 
 app.get("/api/user/info", function (req: any, res: any, next) {
@@ -140,13 +150,13 @@ app.post("/api/user/login", function (req: any, res: any, next) {
       console.log(err);
       res.status(500).send("Errore esecuzione query");
     } else {
-      if(data.length == 0){
+      if (data.length == 0) {
         console.log("Utente non trovato")
         res.status(202).send("Utente non trovato");
-      }else{
-        if(data[0].password == req.body.password){
+      } else {
+        if (data[0].password == req.body.password) {
           res.status(200).send(data);
-        }else{
+        } else {
           console.log("Password errata")
           res.status(201).send("Password errata");
         }
