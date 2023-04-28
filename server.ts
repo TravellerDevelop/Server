@@ -166,3 +166,43 @@ app.post("/api/user/login", function (req: any, res: any, next) {
     req["connessione"].close();
   });
 });
+
+app.get("/api/user/travels", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("travels");
+  let username = req.query.username;
+  console.log(username);
+  collection.find({ creator: username }).toArray(function (err: any, data: any) {
+    console.log(data);
+    if (err) {
+      res.status(500).send("Errore esecuzione query");
+    }
+    else {
+      res.status(200).send(data);
+    }
+  });
+
+});
+
+app.post("/api/travel/create", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("travels");
+  console.log(req.body);
+  collection.insertOne({
+    creator: req.body.creator,
+    name: req.body.name,
+    description: req.body.description,
+    budget: req.body.budget,
+    participants: [],
+    visibility: req.body.visibility,
+    creation_date: req.body.date,
+    new_members_allowed: req.body.new_members_allowed,
+  }, function (err: any, data: any) {
+    if (err) {
+      console.log(err);
+      res.status(500).send("Errore esecuzione query");
+    } else {
+      console.log(data);
+      res.status(200).send(data);
+    }
+    req["connessione"].close();
+  });
+});
