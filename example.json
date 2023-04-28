@@ -54,3 +54,46 @@
         ]
     }
 ]
+
+
+
+key: 'Muzaffarabad', creator: "Marco Montemagno", participants: [
+    "Marco Montemagno",
+    "Domenico Pizzetti",
+    "Micheletto Trentini",
+    "Nanni Pininfarina",
+    "Gelsomina Cuda",
+    "Olga Barcaccia",
+    "Marco Montemagno",
+    "Domenico Pizzetti",
+    "Micheletto Trentini",
+    "Nanni Pininfarina",
+    "Gelsomina Cuda",
+    "Olga Barcaccia"
+]
+
+[
+    {
+        creator: "Bosso",
+        name: "Test travel",
+        description: "Test travel description",
+        budget: 1000,
+        participants: [
+            "Marco Montemagno",
+            "Domenico Pizzetti",
+            "Micheletto Trentini",
+            "Nanni Pininfarina",
+            "Gelsomina Cuda",
+            "Olga Barcaccia",
+            "Marco Montemagno",
+            "Domenico Pizzetti",
+            "Micheletto Trentini",
+            "Nanni Pininfarina",
+            "Gelsomina Cuda",
+            "Olga Barcaccia"
+        ],
+        visibility: 0,
+        creation_date: "2023-01-01",
+        new_members_allowed: 0,
+    }
+]
