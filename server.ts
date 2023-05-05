@@ -230,7 +230,7 @@ app.post("/api/travel/join", function (req: any, res: any, next) {
                 error = true;
               }
             }
-            
+
             if (data[0].participants.includes({ userid: req.body.userid, username: req.body.username })) {
               req["connessione"].close();
               res.status(202).send("Sei già iscritto a questo viaggio");
@@ -270,9 +270,6 @@ app.get("/api/travel/takeJoined", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("travels");
   let username = req.query.username;
   let userid = req.query.userid;
-
-  console.log(username);
-  console.log(userid);
 
   collection.find({ "participants.userid": userid, "participants.username": username  }).toArray(function (err: any, data: any) {
     if (err) {
