@@ -223,7 +223,15 @@ app.post("/api/travel/join", function (req: any, res: any, next) {
             res.status(201).send("Non puoi iscriverti al tuo viaggio");
             error = true;
           } else {
-            if (data[0].participants.includes(req.body.username)) {
+            for(let item of data[0].participants){
+              if(item.userid == req.body.userid){
+                req["connessione"].close();
+                res.status(202).send("Sei già iscritto a questo viaggio");
+                error = true;
+              }
+            }
+            
+            if (data[0].participants.includes({ userid: req.body.userid, username: req.body.username })) {
               req["connessione"].close();
               res.status(202).send("Sei già iscritto a questo viaggio");
               error = true;
@@ -236,7 +244,7 @@ app.post("/api/travel/join", function (req: any, res: any, next) {
               else {
                 //Se non ci sono problemi, aggiunge l'utente alla lista dei partecipanti
                 if (!error) {
-                  collection.updateOne({ code: req.body.code }, { $push: { participants: [req.body.userid, req.body.username] } }, function (err: any, data: any) {
+                  collection.updateOne({ code: req.body.code }, { $push: { participants: { userid: req.body.userid, username: req.body.username } } }, function (err: any, data: any) {
                     if (err) {
                       req["connessione"].close();
                       res.status(500).send("Errore esecuzione query");
@@ -258,6 +266,25 @@ app.post("/api/travel/join", function (req: any, res: any, next) {
     });
 });
 
+app.get("/api/travel/takeJoined", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("travels");
+  let username = req.query.username;
+  let userid = req.query.userid;
+
+  console.log(username);
+  console.log(userid);
+
+  collection.find({ "participants.userid": userid, "participants.username": username  }).toArray(function (err: any, data: any) {
+    if (err) {
+      req["connessione"].close();
+      res.status(500).send("Errore esecuzione query");
+    }
+    else {
+      req["connessione"].close();
+      res.status(200).send(data);
+    }
+  });
+});
 
 
 // GESTIONE DEI POST
