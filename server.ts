@@ -126,7 +126,6 @@ app.post("/api/user/register", function (req: any, res: any, next) {
     password: req.body.password,
     friends: [],
     friends_count: 0,
-    travels: []
   }, function (err: any, data: any) {
     if (err) {
       req["connessione"].close();
@@ -283,6 +282,37 @@ app.get("/api/travel/takeJoined", function (req: any, res: any, next) {
   });
 });
 
+app.get("/api/travel/takeParticipants", function (req: any, res: any, next) {
+  let travel = req.query.travel;
+
+  let collection = req["connessione"].db(DB_NAME).collection("travels");
+  collection.find({ code: travel }).toArray(function (err: any, data: any) {
+    if (err) {
+      req["connessione"].close();
+      res.status(500).send("Errore esecuzione query");
+    }
+    else {
+      let participants = [];
+
+      for (let item of data[0].participants) {
+        participants.push(item.username);
+      }
+
+      let collection2 = req["connessione"].db(DB_NAME).collection("user");
+      collection2.find({ username: { $in: participants } }).toArray(function (err: any, data: any) {
+        console.log("Data ", data)
+        if (err) {
+          req["connessione"].close();
+          res.status(500).send("Errore esecuzione query");
+        }
+        else {
+          req["connessione"].close();
+          res.status(200).send(data);
+        }
+      });
+    }
+  });
+});
 
 // GESTIONE DEI POST
 app.post("/api/post/create", function (req: any, res: any, next) {
@@ -301,7 +331,7 @@ app.post("/api/post/create", function (req: any, res: any, next) {
 app.get("/api/post/take", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("posts");
   let travel = req.query.travel;
-  collection.find({ travel: travel }).toArray(function (err: any, data: any) {
+  collection.find({ travel: travel }).sort({ dateTime: -1 }).toArray(function (err: any, data: any) {
     if (err) {
       req["connessione"].close();
       res.status(500).send("Errore esecuzione query");
