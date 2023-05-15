@@ -366,17 +366,22 @@ app.get("/api/post/takeLastsByUsername", function (req: any, res: any, next) {
   let username = req.query.username;
   let userid = req.query.userid;
 
-  collection2.find({ "participants.userid": userid, "participants.username": username  }).project({_id:1, name: 0, description: 0, budget: 0, email: 0, participants: 0, visibility: 0, creation_date : 0, new_members_allowed: 0, code: 0}).toArray(function (err: any, data: any) {
+  collection2.find({ "participants.userid": userid, "participants.username": username  }).toArray(function (err: any, data: any) {
     if (err) {
       req["connessione"].close();
       res.status(500).send("Errore esecuzione query");
     }
     else {
       let ausData = [];
+      let ausName = [];
       for(let item of data){
         ausData.push(item._id.toString());
+        ausName.push(item.name);
       }
-      console.log(ausData);
+
+      console.log("AusData ")
+      console.log(ausName)
+
       let collection = req["connessione"].db(DB_NAME).collection("posts");
       collection.find({ travel: {$in: ausData} }).sort({ dateTime: -1 }).limit(10).toArray(function (err: any, data: any) {
         if (err) {
@@ -384,12 +389,17 @@ app.get("/api/post/takeLastsByUsername", function (req: any, res: any, next) {
           res.status(500).send("Errore esecuzione query");
         }
         else {
+          let otherData = {}  
+          for(let item in ausData){
+            otherData[ausData[item]] = ausName[item];
+          }
+          console.log("OtherData ")
+          console.log(otherData)
+
           req["connessione"].close();
-          res.status(200).send(data);
+          res.status(200).send([data, otherData]);
         }
       });
     }
   });
-
-
 });
