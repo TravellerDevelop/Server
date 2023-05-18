@@ -117,22 +117,35 @@ app.get("/api/user/info", function (req: any, res: any, next) {
 });
 
 app.post("/api/user/register", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("user");
-  collection.insertOne({
-    name: req.body.name,
-    surname: req.body.surname,
-    username: req.body.username,
-    email: req.body.email,
-    password: req.body.password,
-    friends: [],
-    friends_count: 0,
-  }, function (err: any, data: any) {
+  let collection2 = req["connessione"].db(DB_NAME).collection("user");
+  collection2.find({ username: req.body.username }).toArray(function (err: any, data: any) {
     if (err) {
       req["connessione"].close();
       res.status(500).send("Errore esecuzione query");
     } else {
-      req["connessione"].close();
-      res.status(200).send(data);
+      if (data.length != 0) {
+        req["connessione"].close();
+        res.status(202).send("Username già in uso");
+      } else {
+        let collection = req["connessione"].db(DB_NAME).collection("user");
+        collection.insertOne({
+          name: req.body.name,
+          surname: req.body.surname,
+          username: req.body.username,
+          email: req.body.email,
+          password: req.body.password,
+          friends: [],
+          friends_count: 0,
+        }, function (err: any, data: any) {
+          if (err) {
+            req["connessione"].close();
+            res.status(500).send("Errore esecuzione query");
+          } else {
+            req["connessione"].close();
+            res.status(200).send(data);
+          }
+        });
+      }
     }
   });
 });
@@ -222,8 +235,8 @@ app.post("/api/travel/join", function (req: any, res: any, next) {
             res.status(201).send("Non puoi iscriverti al tuo viaggio");
             error = true;
           } else {
-            for(let item of data[0].participants){
-              if(item.userid == req.body.userid){
+            for (let item of data[0].participants) {
+              if (item.userid == req.body.userid) {
                 req["connessione"].close();
                 res.status(202).send("Sei già iscritto a questo viaggio");
                 error = true;
@@ -270,7 +283,7 @@ app.get("/api/travel/takeJoined", function (req: any, res: any, next) {
   let username = req.query.username;
   let userid = req.query.userid;
 
-  collection.find({ "participants.userid": userid, "participants.username": username  }).sort({creation_date : -1}).toArray(function (err: any, data: any) {
+  collection.find({ "participants.userid": userid, "participants.username": username }).sort({ creation_date: -1 }).toArray(function (err: any, data: any) {
     if (err) {
       req["connessione"].close();
       res.status(500).send("Errore esecuzione query");
@@ -366,7 +379,7 @@ app.get("/api/post/takeLastsByUsername", function (req: any, res: any, next) {
   let username = req.query.username;
   let userid = req.query.userid;
 
-  collection2.find({ "participants.userid": userid, "participants.username": username  }).toArray(function (err: any, data: any) {
+  collection2.find({ "participants.userid": userid, "participants.username": username }).toArray(function (err: any, data: any) {
     if (err) {
       req["connessione"].close();
       res.status(500).send("Errore esecuzione query");
@@ -374,7 +387,7 @@ app.get("/api/post/takeLastsByUsername", function (req: any, res: any, next) {
     else {
       let ausData = [];
       let ausName = [];
-      for(let item of data){
+      for (let item of data) {
         ausData.push(item._id.toString());
         ausName.push(item.name);
       }
@@ -383,14 +396,14 @@ app.get("/api/post/takeLastsByUsername", function (req: any, res: any, next) {
       console.log(ausName)
 
       let collection = req["connessione"].db(DB_NAME).collection("posts");
-      collection.find({ travel: {$in: ausData} }).sort({ dateTime: -1 }).limit(10).toArray(function (err: any, data: any) {
+      collection.find({ travel: { $in: ausData } }).sort({ dateTime: -1 }).limit(100).toArray(function (err: any, data: any) {
         if (err) {
           req["connessione"].close();
           res.status(500).send("Errore esecuzione query");
         }
         else {
-          let otherData = {}  
-          for(let item in ausData){
+          let otherData = {}
+          for (let item in ausData) {
             otherData[ausData[item]] = ausName[item];
           }
           console.log("OtherData ")
