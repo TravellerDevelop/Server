@@ -117,7 +117,6 @@ app.get("/api/user/info", function (req: any, res: any, next) {
 });
 
 app.post("/api/user/fromIdToUsernames", function (req: any, res: any, next) {
-
   let ausId = []; 
   for(let item of  req.body.id){
     ausId.push(new ObjectId(item));
@@ -172,10 +171,11 @@ app.post("/api/user/register", function (req: any, res: any, next) {
 app.get("/api/user/takeTravelsNum" , function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("travels");
   let username = req.query.username;
-  collection.find({ creator: username }).toArray(function (err: any, data: any) {
+  collection.find( { "participants": { "$elemMatch": { "username": username, "creator": true } } }, { "participants.$": 1 }).toArray(function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore esecuzione query");
     } else {
+      console.log(data.length.toString())
       res.send(data.length.toString());
     }
   });
@@ -228,11 +228,10 @@ app.get("/api/user/travels", function (req: any, res: any, next) {
 app.post("/api/travel/create", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("travels");
   collection.insertOne({
-    creator: req.body.creator,
     name: req.body.name,
     description: req.body.description,
     budget: req.body.budget,
-    participants: [],
+    participants: req.body.participants,
     visibility: req.body.visibility,
     creation_date: req.body.date,
     new_members_allowed: req.body.new_members_allowed,
@@ -359,7 +358,7 @@ app.get("/api/travel/takeParticipants", function (req: any, res: any, next) {
 app.get("/api/travel/takeByCreator", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("travels");
   let username = req.query.username;
-  collection.find({ creator: username }).sort({ creation_date: -1 }).toArray(function (err: any, data: any) {
+  collection.find({ "participants": { "$elemMatch": { "username": username, "creator": true } } }, { "participants.$": 1 }).sort({ creation_date: -1 }).toArray(function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore esecuzione query");
     }
@@ -372,7 +371,11 @@ app.get("/api/travel/takeByCreator", function (req: any, res: any, next) {
 // GESTIONE DEI POST
 app.post("/api/post/create", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("posts");
-  collection.insertOne(req.body.param, function (err: any, data: any) {
+
+  let param = req.body.param;
+  param.dateTime = new Date();
+
+  collection.insertOne(param, function (err: any, data: any) {
     if (err) {
       req["connessione"].close();
       res.status(500).send("Errore esecuzione query");
@@ -434,9 +437,6 @@ app.get("/api/post/takeLastsByUsername", function (req: any, res: any, next) {
         ausName.push(item.name);
       }
 
-      console.log("AusData ")
-      console.log(ausName)
-
       let collection = req["connessione"].db(DB_NAME).collection("posts");
       collection.find({ travel: { $in: ausData } }).sort({ dateTime: -1 }).limit(100).toArray(function (err: any, data: any) {
         if (err) {
@@ -448,8 +448,6 @@ app.get("/api/post/takeLastsByUsername", function (req: any, res: any, next) {
           for (let item in ausData) {
             otherData[ausData[item]] = ausName[item];
           }
-          console.log("OtherData ")
-          console.log(otherData)
 
           req["connessione"].close();
           res.status(200).send([data, otherData]);
