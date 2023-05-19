@@ -116,6 +116,25 @@ app.get("/api/user/info", function (req: any, res: any, next) {
   });
 });
 
+app.post("/api/user/fromIdToUsernames", function (req: any, res: any, next) {
+
+  let ausId = []; 
+  for(let item of  req.body.id){
+    ausId.push(new ObjectId(item));
+  }
+
+  let collection = req["connessione"].db(DB_NAME).collection("user");
+  let id = req.query.id;
+  collection.find({ _id: {$in: ausId} }).toArray(function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query");
+    } else {
+      res.send(data);
+    }
+    req["connessione"].close();
+  });
+});
+
 app.post("/api/user/register", function (req: any, res: any, next) {
   let collection2 = req["connessione"].db(DB_NAME).collection("user");
   collection2.find({ username: req.body.username }).toArray(function (err: any, data: any) {
@@ -149,6 +168,19 @@ app.post("/api/user/register", function (req: any, res: any, next) {
     }
   });
 });
+
+app.get("/api/user/takeTravelsNum" , function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("travels");
+  let username = req.query.username;
+  collection.find({ creator: username }).toArray(function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query");
+    } else {
+      res.send(data.length.toString());
+    }
+  });
+});
+
 
 app.post("/api/user/login", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("user");
@@ -219,8 +251,6 @@ app.post("/api/travel/create", function (req: any, res: any, next) {
 app.post("/api/travel/join", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("travels");
   let error = false;
-
-  //Verifica che non sia l'autore del viaggio e che non sia già iscritto
   collection.find({ code: req.body.code })
     .toArray(function (err: any, data: any) {
       if (err) {
@@ -254,7 +284,6 @@ app.post("/api/travel/join", function (req: any, res: any, next) {
                 error = true;
               }
               else {
-                //Se non ci sono problemi, aggiunge l'utente alla lista dei partecipanti
                 if (!error) {
                   collection.updateOne({ code: req.body.code }, { $push: { participants: { userid: req.body.userid, username: req.body.username } } }, function (err: any, data: any) {
                     if (err) {
@@ -323,6 +352,19 @@ app.get("/api/travel/takeParticipants", function (req: any, res: any, next) {
           res.status(200).send(data);
         }
       });
+    }
+  });
+});
+
+app.get("/api/travel/takeByCreator", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("travels");
+  let username = req.query.username;
+  collection.find({ creator: username }).sort({ creation_date: -1 }).toArray(function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query");
+    }
+    else {
+      res.status(200).send(data);
     }
   });
 });
@@ -413,6 +455,22 @@ app.get("/api/post/takeLastsByUsername", function (req: any, res: any, next) {
           res.status(200).send([data, otherData]);
         }
       });
+    }
+  });
+});
+
+app.post("/api/post/updatePayment", function (req: any, res: any, next) {
+  let id = req.body.id;
+  let destinator = req.body.destinator;
+
+  let collection = req["connessione"].db(DB_NAME).collection("posts");
+  collection.updateOne({ _id: new ObjectId(id) }, { $set: { destinator: destinator } }, function (err: any, data: any) {
+    if (err) {
+      req["connessione"].close();
+      res.status(500).send("Errore esecuzione query");
+    } else {
+      req["connessione"].close();
+      res.status(200).send(data);
     }
   });
 });
