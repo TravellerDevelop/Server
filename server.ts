@@ -472,3 +472,36 @@ app.post("/api/post/updatePayment", function (req: any, res: any, next) {
     }
   });
 });
+
+app.post("/api/post/updatePinPost", function (req: any, res: any, next) {
+  let id = req.body.param._id;
+  let param = req.body.param;
+
+  console.log("Param ", id)
+
+  let collection = req["connessione"].db(DB_NAME).collection("posts");
+  collection.updateOne({ _id: new Object(id) }, { $set: {pinned:  param.pinned} }, function (err: any, data: any) {
+    if (err) {
+      req["connessione"].close();
+      res.status(500).send("Errore esecuzione query");
+    } else {
+      req["connessione"].close();
+      res.status(200).send(data);
+    }
+  });
+});
+
+app.post("/api/post/deletePost", function (req: any, res: any, next) {
+  let id = req.body.id;
+
+  let collection = req["connessione"].db(DB_NAME).collection("posts");
+  collection.deleteOne({ _id: new ObjectId(id) }, function (err: any, data: any) {
+    if (err) {
+      req["connessione"].close();
+      res.status(500).send("Errore esecuzione query");
+    } else {
+      req["connessione"].close();
+      res.status(200).send(data);
+    }
+  });
+});
