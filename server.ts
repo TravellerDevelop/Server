@@ -116,6 +116,20 @@ app.get("/api/user/info", function (req: any, res: any, next) {
   });
 });
 
+app.get("/api/user/takeUserById", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("user");
+  let id = req.query.id;
+  
+  collection.find({ _id: new ObjectId(id) }).toArray(function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query");
+    } else {
+      res.send(data);
+    }
+    req["connessione"].close();
+  });
+});
+
 app.post("/api/user/fromIdToUsernames", function (req: any, res: any, next) {
   let ausId = []; 
   for(let item of  req.body.id){
@@ -504,4 +518,113 @@ app.post("/api/post/deletePost", function (req: any, res: any, next) {
       res.status(200).send(data);
     }
   });
+});
+
+// GESTIONE FOLLOW
+app.post("/api/follow/create", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("follow");
+
+  collection.insertOne({
+    from: req.body.from,
+    to: req.body.to,
+    accepted: false,
+  }, function (err: any, data: any) {
+    if (err) {
+      req["connessione"].close();
+      res.status(500).send("Errore esecuzione query");
+    } else {
+      req["connessione"].close();
+      res.status(200).send(data);
+    }
+  });
+});
+
+app.get("/api/follow/takeFromTo", function (req: any, res: any, next) {
+  let from = req.query.from;
+  let to = req.query.to;
+
+  let collection = req["connessione"].db(DB_NAME).collection("follow");
+
+  collection.find({ from: from, to: to }).toArray(function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query");
+    }
+    else {
+      res.status(200).send(data);
+    }
+  })
+});
+
+app.post("/api/follow/delete", function (req: any, res: any, next) {
+  let from = req.body.from;
+  let to = req.body.to;
+
+  let collection = req["connessione"].db(DB_NAME).collection("follow");
+
+  collection.deleteOne({ from: from, to: to }, function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query");
+    }
+    else {
+      res.status(200).send(data);
+    }
+  })
+});
+
+app.get("/api/follow/takeFollowersRequest", function (req: any, res: any, next) {
+  let to = req.query.to;
+
+  let collection = req["connessione"].db(DB_NAME).collection("follow");
+  collection.find({ to: to, accepted: false }).toArray(function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query");
+    }
+    else {
+      res.status(200).send(data);
+    }
+  })
+});
+
+app.post("/api/follow/accept", function (req: any, res: any, next) {
+  let from = req.body.from;
+  let to = req.body.to;
+
+  let collection = req["connessione"].db(DB_NAME).collection("follow");
+
+  collection.updateOne({ from: from, to: to }, { $set: { accepted: true } }, function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query");
+    }
+    else {
+      res.status(200).send(data);
+    }
+  })
+});
+
+app.get("/api/follow/takeFollowers", function (req: any, res: any, next) {
+  let to = req.query.to;
+
+  let collection = req["connessione"].db(DB_NAME).collection("follow");
+  collection.find({ to: to, accepted: true }).toArray(function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query");
+    }
+    else {
+      res.status(200).send(data);
+    }
+  })
+});
+
+app.get("/api/follow/takeFollowings", function (req: any, res: any, next) {
+  let from = req.query.from;
+
+  let collection = req["connessione"].db(DB_NAME).collection("follow");
+  collection.find({ from: from, accepted: true }).toArray(function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query");
+    }
+    else {
+      res.status(200).send(data);
+    }
+  })
 });
