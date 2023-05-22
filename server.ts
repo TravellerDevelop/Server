@@ -654,3 +654,35 @@ app.get("/api/follow/takeFollowings", function (req: any, res: any, next) {
     req["connessione"].close();
   })
 });
+
+// Gestione ticket
+app.post("/api/tickets/create", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("tickets");
+
+  collection.insertOne(req.body.data, function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query");
+    } else {
+      res.status(200).send(data);
+    }
+
+    req["connessione"].close();
+  });
+});
+
+app.get("/api/tickets/take", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("tickets");
+  let userid = req.query.userid;
+  collection.find({ creator: userid }).sort({ date: -1 }).toArray(function (err: any, data: any) {
+    if (err) {
+      console.log("Errore esecuzione query");
+      res.status(500).send("Errore esecuzione query");
+      req["connessione"].close();
+    }
+    else {
+      res.status(200).send(data);
+    }
+
+    req["connessione"].close();
+  });
+})
