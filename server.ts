@@ -237,6 +237,20 @@ app.get("/api/user/travels", function (req: any, res: any, next) {
 
 });
 
+app.get("/api/user/search", function (req: any, res: any, next) {
+  // Ricerca le similitudini tra username, nome e cognome
+  let collection = req["connessione"].db(DB_NAME).collection("user");
+  let username = req.query.username;
+  const regex = new RegExp(username, 'i');
+  collection.find({ $or: [{ username: { $regex: regex } }, { name: { $regex: regex } }, { surname: { $regex: regex } }] }).limit(3).toArray(function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query");
+    }
+    else {
+      res.status(200).send(data);
+    }
+  });
+});
 
 // GESTIONE TRAVELS
 app.post("/api/travel/create", function (req: any, res: any, next) {
