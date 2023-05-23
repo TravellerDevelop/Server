@@ -675,9 +675,7 @@ app.get("/api/tickets/take", function (req: any, res: any, next) {
   let userid = req.query.userid;
   collection.find({ creator: userid }).sort({ date: -1 }).toArray(function (err: any, data: any) {
     if (err) {
-      console.log("Errore esecuzione query");
       res.status(500).send("Errore esecuzione query");
-      req["connessione"].close();
     }
     else {
       res.status(200).send(data);
