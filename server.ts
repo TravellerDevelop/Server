@@ -741,4 +741,19 @@ app.get("/api/tickets/take", function (req: any, res: any, next) {
 
     req["connessione"].close();
   });
-})
+});
+
+app.post("/api/tickets/delete", function (req: any, res: any, next) {
+  let id = req.body.id;
+
+  let collection = req["connessione"].db(DB_NAME).collection("tickets");
+  collection.deleteOne({ _id: new ObjectId(id) }, function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query 1");
+    } else {
+      res.status(200).send(data);
+    }
+
+    req["connessione"].close();
+  });
+});
