@@ -152,35 +152,25 @@ app.post("/api/user/register", function (req: any, res: any, next) {
   let collection2 = req["connessione"].db(DB_NAME).collection("user");
   collection2.find({ username: req.body.username }).toArray(function (err: any, data: any) {
     if (err) {
-      req["connessione"].close();
       res.status(500).send("Errore esecuzione query");
+      console.log("Errore esecuzione query 1");
     } else {
       if (data.length != 0) {
-        req["connessione"].close();
         res.status(202).send("Username già in uso");
       } else {
         let collection = req["connessione"].db(DB_NAME).collection("user");
-        collection.insertOne({
-          name: req.body.name,
-          surname: req.body.surname,
-          username: req.body.username,
-          email: req.body.email,
-          password: req.body.password,
-          friends: [],
-          friends_count: 0,
-        }, function (err: any, data: any) {
+        collection.insertOne(req.body, function (err: any, data: any) {
           if (err) {
-            req["connessione"].close();
             res.status(500).send("Errore esecuzione query");
+            console.log("Errore esecuzione query 2\n", err);
           } else {
-            req["connessione"].close();
             res.status(200).send(data);
           }
+          req["connessione"].close();
         });
       }
     }
 
-    req["connessione"].close();
   });
 });
 
@@ -204,18 +194,14 @@ app.post("/api/user/login", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("user");
   collection.find({ username: req.body.username }).toArray(function (err: any, data: any) {
     if (err) {
-      req["connessione"].close();
       res.status(500).send("Errore esecuzione query");
     } else {
       if (data.length == 0) {
-        req["connessione"].close();
         res.status(202).send("Utente non trovato");
       } else {
         if (data[0].password == req.body.password) {
-          req["connessione"].close();
           res.status(200).send(data);
         } else {
-          req["connessione"].close();
           res.status(201).send("Password errata");
         }
       }
@@ -449,7 +435,7 @@ app.get("/api/post/takeLastsByUsername", function (req: any, res: any, next) {
   let collection2 = req["connessione"].db(DB_NAME).collection("travels");
   let username = req.query.username;
   let userid = req.query.userid;
-  
+
   collection2.find({ "participants.userid": userid, "participants.username": username }).toArray(function (err: any, data: any) {
     if (err) {
       console.log("Errore esecuzione query");
@@ -531,6 +517,77 @@ app.post("/api/post/deletePost", function (req: any, res: any, next) {
     }
 
     req["connessione"].close();
+  });
+});
+
+app.get("/api/post/takeTotalExpenses", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("posts");
+  let userid = req.query.userid;
+  collection.find({ type: "payments", "destinator.userid": userid }).toArray(function (err: any, data: any) {
+    if (err) {
+      console.log("Errore esecuzione query");
+      res.status(500).send("Errore esecuzione query");
+      req["connessione"].close();
+    }
+    else {
+      let tot = 0;
+      for (let item of data) {
+        tot += item.amount;
+      }
+
+      res.status(200).send(tot.toString());
+      req["connessione"].close();
+    }
+
+  });
+});
+
+app.get("/api/post/takeTotalToPay", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("posts");
+  let userid = req.query.userid;
+  collection.find({ destinator: { $elemMatch: { userid: userid, payed: false } } }).toArray(function (err: any, data: any) {
+    if (err) {
+      console.log("Errore esecuzione query");
+      res.status(500).send("Errore esecuzione query");
+      req["connessione"].close();
+    }
+    else {
+      let sum = 0;
+      for (let item of data) {
+        sum += item.amount;
+      }
+
+      res.status(200).send(sum.toString());
+      req["connessione"].close();
+    }
+  });
+});
+
+app.get("/api/post/takeTotalToReceive", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("posts");
+  let username = req.query.username;
+  let userid = req.query.userid;
+  collection.find({ creator: username, type: "payments" }).toArray(function (err: any, data: any) {
+    if (err) {
+      console.log("Errore esecuzione query");
+      res.status(500).send("Errore esecuzione query");
+      req["connessione"].close();
+    }
+    else {
+      let sum = 0;
+
+      console.log(data)
+      for (let item of data) {
+        for (let i of item.destinator) {
+          if (i.payed === false && i.userid != userid) {
+            sum += item.amount;
+          }
+        }
+      }
+
+      res.status(200).send(sum.toString());
+      req["connessione"].close();
+    }
   });
 });
 
@@ -658,8 +715,9 @@ app.get("/api/follow/takeFollowings", function (req: any, res: any, next) {
 // Gestione ticket
 app.post("/api/tickets/create", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("tickets");
-
-  collection.insertOne(req.body.data, function (err: any, data: any) {
+  let param = req.body.data;
+  param.date = new Date(param.date);
+  collection.insertOne(param, function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore esecuzione query");
     } else {
