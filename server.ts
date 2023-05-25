@@ -103,6 +103,21 @@ app.get("/api/verifyConnection", function (req: any, res: any, next) {
   });
 });
 
+app.get("/api/takeVersion", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("test");
+
+  collection.find({_id: new ObjectId("646f82d1e77fa64f3e358dd1")}).toArray(function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore nella connessione al database");
+    } else {
+      if (data.length != 0) {
+        res.status(200).send(data);
+      }
+    }
+    req["connessione"].close();
+  });
+});
+
 app.get("/api/user/info", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("user");
   let username = req.query.username;
@@ -229,7 +244,6 @@ app.get("/api/user/travels", function (req: any, res: any, next) {
 });
 
 app.get("/api/user/search", function (req: any, res: any, next) {
-  // Ricerca le similitudini tra username, nome e cognome
   let collection = req["connessione"].db(DB_NAME).collection("user");
   let username = req.query.username;
   const regex = new RegExp(username, 'i');
@@ -257,6 +271,7 @@ app.post("/api/travel/create", function (req: any, res: any, next) {
     creation_date: req.body.date,
     new_members_allowed: req.body.new_members_allowed,
     code: req.body.code,
+    closed: false,
   }, function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore esecuzione query");
@@ -325,7 +340,7 @@ app.get("/api/travel/takeJoined", function (req: any, res: any, next) {
   let username = req.query.username;
   let userid = req.query.userid;
 
-  collection.find({ "participants.userid": userid, "participants.username": username }).sort({ creation_date: -1 }).toArray(function (err: any, data: any) {
+  collection.find({ "participants.userid": userid, "participants.username": username, closed: false }).sort({ creation_date: -1 }).toArray(function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore esecuzione query");
     }
@@ -360,10 +375,9 @@ app.get("/api/travel/takeParticipants", function (req: any, res: any, next) {
         else {
           res.status(200).send(data);
         }
+        req["connessione"].close();
       });
     }
-
-    req["connessione"].close();
   });
 });
 
@@ -381,6 +395,67 @@ app.get("/api/travel/takeByCreator", function (req: any, res: any, next) {
     req["connessione"].close();
   });
 });
+
+app.post("/api/travel/update", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("travels");
+  let param = req.body.param;
+  let id = req.body.id;
+
+  console.log(param)
+
+  collection.updateOne({ _id: new ObjectId(id) }, { $set: { name: param.name, description: param.description, budget: param.budget } }, function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query 1");
+    }
+    else {
+      res.status(200).send(data);
+    }
+
+    req["connessione"].close();
+  });
+});
+
+app.post("/api/travel/close", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("travels");
+  let id = req.body.id;
+
+  collection.updateOne({ _id: new ObjectId(id) }, { $set: { closed: true } }, function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query 1");
+    }
+    else {
+      res.status(200).send(data);
+    }
+
+    req["connessione"].close();
+  });
+});
+
+app.post("/api/travel/delete", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("travels");
+  let id = req.body.id;
+  console.log(id)
+  collection.deleteOne({ _id: new ObjectId(id) }, function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query 1");
+    }
+    else {
+      let collection2 = req["connessione"].db(DB_NAME).collection("posts");
+
+      collection2.deleteMany({ travel: id }, function (err: any, data: any) {
+        if (err) {
+          res.status(500).send("Errore esecuzione query 1");
+        }
+        else {
+          res.status(200).send(data);
+        }
+
+        req["connessione"].close();
+      })
+    }
+  });
+});
+
 
 // GESTIONE DEI POST
 app.post("/api/post/create", function (req: any, res: any, next) {
@@ -491,10 +566,10 @@ app.post("/api/post/updatePayment", function (req: any, res: any, next) {
 
 app.post("/api/post/updatePinPost", function (req: any, res: any, next) {
   let id = req.body.param._id;
-  let param = req.body.param;
+  let pinned = req.body.param.pinned;
 
   let collection = req["connessione"].db(DB_NAME).collection("posts");
-  collection.updateOne({ _id: new Object(id) }, { $set: { pinned: param.pinned } }, function (err: any, data: any) {
+  collection.updateOne({ _id: new Object(id) }, { $set: { "pinned": pinned } }, function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore esecuzione query");
     } else {
@@ -590,6 +665,77 @@ app.get("/api/post/takeTotalToReceive", function (req: any, res: any, next) {
     }
   });
 });
+
+app.get("/api/post/takeTotalPayedByTravel", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("posts");
+
+  let travel = req.query.travel;
+  let userid = req.query.userid;
+
+  collection.find({ travel: travel, "destinator.userid": userid, type: "payments" }).toArray(function (err: any, data: any) {
+    if (err) {
+      console.log("Errore esecuzione query");
+      res.status(500).send("Errore esecuzione query");
+      req["connessione"].close();
+    }
+    else {
+      console.log(data)
+
+      let sum = 0;
+      for (let item of data) {
+        sum += item.amount;
+      }
+
+      res.status(200).send(sum.toString());
+      req["connessione"].close();
+    }
+  });
+});
+
+app.get("/api/post/takePayedGroupByTravel", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("posts");
+
+  let userid = req.query.userid;
+
+  collection.aggregate([
+    { $match: { "destinator.userid": userid, type: "payments" } },
+    { $unwind: "$destinator" },
+    { $match: { "destinator.userid": userid, type: "payments" } },
+    {
+      $group: {
+        _id: "$travel",
+        total: { $sum: "$amount" }
+      }
+    }
+  ]).toArray(function (err: any, data: any) {
+    if (err) {
+      console.log("Errore esecuzione query");
+      res.status(500).send("Errore esecuzione query");
+      req["connessione"].close();
+    }
+    else {
+      let collection2 = req["connessione"].db(DB_NAME).collection("travels");
+
+      collection2.find({ _id: { $in: data.map((item: any) => new ObjectId(item._id)) } }).toArray(function (err: any, data2: any) {
+        if (err) {
+          console.log("Errore esecuzione query");
+          res.status(500).send("Errore esecuzione query");
+          req["connessione"].close();
+        }
+        else {
+          let ausData = [];
+          for (let item of data2) {
+            ausData.push({ name: item.name, total: data.filter((item2: any) => item2._id == item._id)[0].total });
+          }
+
+          res.status(200).send(ausData);
+          req["connessione"].close();
+        }
+      });
+    }
+  });
+});
+
 
 // GESTIONE FOLLOW
 app.post("/api/follow/create", function (req: any, res: any, next) {
@@ -712,6 +858,35 @@ app.get("/api/follow/takeFollowings", function (req: any, res: any, next) {
   })
 });
 
+app.get("/api/follow/takeFollowingsWithInfo", function (req: any, res: any, next) {
+  let from = req.query.from;
+
+  let collection = req["connessione"].db(DB_NAME).collection("follow");
+  collection.find({ from: from, accepted: true }).toArray(function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query 1");
+    }
+    else {
+      let aus = [];
+      for (let item of data) {
+        aus.push(new ObjectId(item.to));
+      }
+
+      let collection2 = req["connessione"].db(DB_NAME).collection("user");
+      collection2.find({ _id: { $in: aus } }).toArray(function (err: any, data: any) {
+        if (err) {
+          res.status(500).send("Errore esecuzione query 2");
+        }
+        else {
+          res.status(200).send(data);
+        }
+
+        req["connessione"].close();
+      });
+    }
+  })
+});
+
 // Gestione ticket
 app.post("/api/tickets/create", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("tickets");
@@ -757,3 +932,23 @@ app.post("/api/tickets/delete", function (req: any, res: any, next) {
     req["connessione"].close();
   });
 });
+
+app.post("/api/tickets/share", function (req: any, res: any, next) {
+  let id = req.body.userid;
+  let content = req.body.content;
+  let createBy = req.body.createBy;
+
+  content.creator = id;
+  content.sharedBy = createBy;
+
+  let collection = req["connessione"].db(DB_NAME).collection("tickets");
+  collection.insertOne(content, function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore esecuzione query 1");
+    } else {
+      res.status(200).send(data);
+    }
+
+    req["connessione"].close();
+  });
+})
