@@ -106,7 +106,7 @@ app.get("/api/verifyConnection", function (req: any, res: any, next) {
 app.get("/api/takeVersion", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("test");
 
-  collection.find({_id: new ObjectId("646f82d1e77fa64f3e358dd1")}).toArray(function (err: any, data: any) {
+  collection.find({ _id: new ObjectId("646f82d1e77fa64f3e358dd1") }).toArray(function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore nella connessione al database");
     } else {
@@ -290,25 +290,30 @@ app.post("/api/travel/join", function (req: any, res: any, next) {
     .toArray(function (err: any, data: any) {
       if (err) {
         res.status(500).send("Errore esecuzione query");
+        req["connessione"].close();
         error = true;
       } else {
         if (data.length == 1) {
           if (data[0].creator == req.body.username) {
             res.status(201).send("Non puoi iscriverti al tuo viaggio");
+            req["connessione"].close();
             error = true;
           } else {
             for (let item of data[0].participants) {
               if (item.userid == req.body.userid) {
                 res.status(202).send("Sei già iscritto a questo viaggio");
+                req["connessione"].close();
                 error = true;
               }
             }
 
             if (data[0].participants.includes({ userid: req.body.userid, username: req.body.username })) {
               res.status(202).send("Sei già iscritto a questo viaggio");
+              req["connessione"].close();
               error = true;
             } else {
               if (data[0].new_members_allowed == "0") {
+                req["connessione"].close();
                 res.status(203).send("Non puoi iscriverti a questo viaggio");
                 error = true;
               }
@@ -320,6 +325,7 @@ app.post("/api/travel/join", function (req: any, res: any, next) {
                     } else {
                       res.status(200).send(data);
                     }
+                    req["connessione"].close();
                   });
                 }
               }
@@ -328,10 +334,10 @@ app.post("/api/travel/join", function (req: any, res: any, next) {
         } else {
           res.status(201).send("Codice viaggio non valido");
           error = true;
+          req["connessione"].close();
         }
       }
 
-      req["connessione"].close();
     });
 });
 
@@ -456,6 +462,55 @@ app.post("/api/travel/delete", function (req: any, res: any, next) {
   });
 });
 
+app.post("/api/travel/leave", function (req: any, res: any, next) {
+  let collection = req["connessione"].db(DB_NAME).collection("travels");
+  let travel = req.body.travel;
+  let userid = req.body.userid;
+
+  collection.findOne({ _id: new ObjectId(travel) }, function (err: any, data: any) {
+    if (err) {
+      req["connessione"].close();
+      res.status(500).send("Errore esecuzione query 1");
+    }
+    else {
+      if (data.participants.length == 1) {
+        collection.deleteOne({ _id: new ObjectId(travel) }, function (err: any, data: any) {
+          if (err) {
+            res.status(500).send("Errore esecuzione query 1");
+          }
+          else {
+            let collection2 = req["connessione"].db(DB_NAME).collection("posts");
+
+            collection2.deleteMany({ travel: travel }, function (err: any, data: any) {
+              if (err) {
+                res.status(500).send("Errore esecuzione query 1");
+              }
+              else {
+                res.status(200).send(data);
+              }
+
+              req["connessione"].close();
+            })
+          }
+        });
+      }
+      else {
+        let aus = data.participants.filter((item: any) => item.userid != userid);
+
+        collection.updateOne({ _id: new ObjectId(travel) }, { $set: { participants: aus } }, function (err: any, data: any) {
+          if (err) {
+            res.status(500).send("Errore esecuzione query 1");
+          }
+          else {
+            res.status(200).send(data);
+          }
+
+          req["connessione"].close();
+        });
+      }
+    }
+  });
+});
 
 // GESTIONE DEI POST
 app.post("/api/post/create", function (req: any, res: any, next) {
