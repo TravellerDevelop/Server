@@ -57,17 +57,23 @@
                     <!-- Mashead text and app badges-->
                     <div class="mb-5 mb-lg-0 text-center text-lg-start">
                         <h1 class="display-1 lh-1 mb-3">Dove andiamo oggi?</h1>
-                        <p class="lead fw-normal text-muted mb-5">Organizza il tuo viaggio, lasciati ispirare dai tuoi amici e goditelo!</p>
+                        <p class="lead fw-normal text-muted mb-5">Organizza il tuo viaggio, lasciati ispirare dai tuoi
+                            amici e goditelo!</p>
                         <div class="d-flex flex-column flex-lg-row align-items-center">
-                            <a href="assets/download/Traveller.apk"
-                                style="text-decoration: none;"
-                            >
-                                <div style="height: 50px; padding: 10px; background-color: #4900FF; border-radius: 5px; display: flex; flex-direction: row; justify-content: center;">
+                            <a href="assets/download/Traveller.apk" style="text-decoration: none;">
+                                <div
+                                    style="height: 50px; padding: 10px; background-color: #4900FF; border-radius: 5px; display: flex; flex-direction: row; justify-content: center;">
                                     <img src="assets/img/android-svgrepo-com.svg" style="margin-right: 20px;" />
-                                    <p style="color: white; margin-bottom: 0px !important; font-weight: bold; font-size: 16pt;">Scarica l'app</p>
+                                    <p
+                                        style="color: white; margin-bottom: 0px !important; font-weight: bold; font-size: 16pt;">
+                                        Scarica l'app</p>
                                 </div>
                             </a>
+
                         </div>
+                        <a href="#new" style="margin-top: 20px !important;">
+                            Novità della versione 1.0.1
+                        </a>
                     </div>
                 </div>
                 <div class="col-lg-6">
@@ -115,7 +121,8 @@
         <div class="container px-5">
             <div class="row gx-5 justify-content-center">
                 <div class="col-xl-8">
-                    <div class="h2 fs-1 text-white mb-4">"Il mondo è un libro e quelli che non viaggiano ne leggono solo una pagina." - Sant'Agostino</div>
+                    <div class="h2 fs-1 text-white mb-4">"Il mondo è un libro e quelli che non viaggiano ne leggono solo
+                        una pagina." - Sant'Agostino</div>
                     <!-- <img src="assets/img/tnw-logo.svg" alt="..." style="height: 3rem" /> -->
                 </div>
             </div>
@@ -217,7 +224,10 @@
             <div class="row gx-5 align-items-center justify-content-center justify-content-lg-between">
                 <div class="col-12 col-lg-5">
                     <h2 class="display-4 lh-1 mb-4">Tutto molto più semplice</h2>
-                    <p class="lead fw-normal text-muted mb-5 mb-lg-0">Siamo consapevoli di quanto possa essere stressante organizzare un viaggio, soprattutto se non si ha molto tempo a disposizione. Ecco perché abbiamo creato un'app che semplifica al massimo la pianificazione, integrando tutti i migliori servizi in un unico spazio!</p>
+                    <p class="lead fw-normal text-muted mb-5 mb-lg-0">Siamo consapevoli di quanto possa essere
+                        stressante organizzare un viaggio, soprattutto se non si ha molto tempo a disposizione. Ecco
+                        perché abbiamo creato un'app che semplifica al massimo la pianificazione, integrando tutti i
+                        migliori servizi in un unico spazio!</p>
                 </div>
                 <div class="col-sm-8 col-md-6">
                     <div class="px-5 px-sm-0"><img class="img-fluid rounded-circle"
@@ -240,22 +250,37 @@
         </div>
     </section>
     <!-- App badge section-->
-    <section class="bg-gradient-primary-to-secondary" id="download">
+    <section class="bg-gradient-primary-to-secondary" id="new">
         <div class="container px-5">
-            <h2 class="text-center text-white font-alt mb-4">Scarica ora l'app!</h2>
-            <div class="d-flex flex-column flex-lg-row align-items-center justify-content-center">
-                <a href="assets/download/Traveller.apk"
-                    style="text-decoration: none;"
-                >
-                    <div style="height: 50px; padding: 10px; background-color: #FFF; border-radius: 5px; display: flex; flex-direction: row; justify-content: center;">
-                        <img src="assets/img/android-svgrepo-com.svg" style="margin-right: 20px;" />
-                        <p style="color: #4900FF; margin-bottom: 0px !important; font-weight: bold; font-size: 16pt; text-decoration: none; ">Scarica l'app</p>
-                    </div>
-                </a>
-            </div>
+            <h2 class=" text-white font-alt mb-4">Novità versione 1.0.1</h2>
+            <style>
+                li{
+                    color: white;
+                    font-size: 20px;
+                    margin-bottom: 10px;
+                }
+
+                h5{
+                    color: white;
+                    font-family: "Kanit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" !important;
+                    font-size: 25px;
+                    margin-bottom: 10px;
+                }
+            </style>
+            <h5>Bug fix</h5>
+            <ul>
+                <li>Risolto bug che non permetteva la modifica di un viaggio se non si era impostato il budget</li>
+                <li>Risolto bug che metteva che non si era pagato un pagamento anche se si era il proprietario</li>
+                <li>Risolto bug che permetteva di visualizzare i pagamenti non propri</li>
+                <li>Risolto bug che non lasciava vedere tutti i profili con cui si possono condividere i biglietti</li>
+            </ul>
+            <h5>Implementazioni</h5>
+            <ul>
+                <li>Aggiunta barra di ricerca degli amici nella condivisione dei biglietti</li>
+            </ul>
         </div>
     </section>
-<!-- 
+    <!-- 
     <div id="contact">
         <p class="display-4 lh-1 mb-4 text-center margin-top">Contatti</p>
         <p class="lead fw-normal text-muted mb-5 mb-lg-0">Email: pietro.bossolasco@gmail.com</p>
