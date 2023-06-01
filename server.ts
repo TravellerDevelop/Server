@@ -20,6 +20,7 @@ const io = new Server(httpServer);
 const PORT = process.env.PORT || 1337;
 const DB_NAME = "traveller";
 const connectionString: any = process.env.connectionString;
+const fileupload = require('express-fileupload');
 const socket: any = [];
 
 //CREAZIONE E AVVIO DEL SERVER HTTP
@@ -87,6 +88,11 @@ app.use("/api/", function (req: any, res: any, next) {
       res.status(503).send(msg);
     });
 });
+
+app.use(fileupload({
+  "limits ": { "fileSize ": (20 * 1024 * 1024) } // 20 MB
+}));
+
 
 /***********USER LISTENER****************/
 app.get("/api/verifyConnection", function (req: any, res: any, next) {
@@ -262,17 +268,10 @@ app.get("/api/user/search", function (req: any, res: any, next) {
 // GESTIONE TRAVELS
 app.post("/api/travel/create", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("travels");
-  collection.insertOne({
-    name: req.body.name,
-    description: req.body.description,
-    budget: req.body.budget,
-    participants: req.body.participants,
-    visibility: req.body.visibility,
-    creation_date: req.body.date,
-    new_members_allowed: req.body.new_members_allowed,
-    code: req.body.code,
-    closed: false,
-  }, function (err: any, data: any) {
+  let param: any = req.body;
+  param.creation_date = new Date(param.creation_date);
+
+  collection.insertOne(param, function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore esecuzione query");
     } else {
@@ -438,26 +437,42 @@ app.post("/api/travel/close", function (req: any, res: any, next) {
 });
 
 app.post("/api/travel/delete", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("travels");
+  let collection0 = req["connessione"].db(DB_NAME).collection("travels");
   let id = req.body.id;
   console.log(id)
-  collection.deleteOne({ _id: new ObjectId(id) }, function (err: any, data: any) {
+
+  collection0.find({ _id: new ObjectId(id) }).toArray(function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore esecuzione query 1");
     }
     else {
-      let collection2 = req["connessione"].db(DB_NAME).collection("posts");
-
-      collection2.deleteMany({ travel: id }, function (err: any, data: any) {
+      if (data[0].image){
+        fs.unlink("./static/userImage/" + data[0].image, (err: any) => {
+          if (err) {
+            console.log("Errore eliminazione immagine");
+          }
+        });
+      }
+      let collection = req["connessione"].db(DB_NAME).collection("travels");
+      collection.deleteOne({ _id: new ObjectId(id) }, function (err: any, data: any) {
         if (err) {
           res.status(500).send("Errore esecuzione query 1");
         }
         else {
-          res.status(200).send(data);
-        }
+          let collection2 = req["connessione"].db(DB_NAME).collection("posts");
 
-        req["connessione"].close();
-      })
+          collection2.deleteMany({ travel: id }, function (err: any, data: any) {
+            if (err) {
+              res.status(500).send("Errore esecuzione query 1");
+            }
+            else {
+              res.status(200).send(data);
+            }
+
+            req["connessione"].close();
+          })
+        }
+      });
     }
   });
 });
@@ -511,6 +526,31 @@ app.post("/api/travel/leave", function (req: any, res: any, next) {
     }
   });
 });
+
+app.post('/api/travel/uploadImage', function (req, res, next) {
+  let img = req.body.img;
+  let imgName = req.body.imgName;
+
+  let newName = Math.random().toString(36).substring(2, 20) + Math.random().toString(36).substring(2, 20);
+
+  // Prende il nome dell'estensione da imgName
+  let aus = imgName.split(".");
+  let ext = aus[aus.length - 1];
+
+  let imgData = img.replace(/^data:image\/\w+;base64,/, "");
+  let buffer = Buffer.from(imgData, "base64");
+  fs.writeFile("./static/userImage/" + newName + "." + ext, buffer, (err: any) => {
+    if (err) {
+      res.status(500);
+      res.send(err.message);
+      console.log(err.message);
+    }
+    else {
+      res.status(200);
+      res.send(newName + "." + ext);
+    }
+  });
+})
 
 // GESTIONE DEI POST
 app.post("/api/post/create", function (req: any, res: any, next) {
@@ -1007,3 +1047,8 @@ app.post("/api/tickets/share", function (req: any, res: any, next) {
     req["connessione"].close();
   });
 })
+
+// Gestione socket
+io.on('connection', function (clientSocket) {
+  console.log(' User ' + clientSocket.id + ' isConnected!');
+});
