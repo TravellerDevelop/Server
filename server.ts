@@ -446,7 +446,7 @@ app.post("/api/travel/delete", function (req: any, res: any, next) {
       res.status(500).send("Errore esecuzione query 1");
     }
     else {
-      if (data[0].image){
+      if (data[0].image) {
         fs.unlink("./static/userImage/" + data[0].image, (err: any) => {
           if (err) {
             console.log("Errore eliminazione immagine");
@@ -533,7 +533,6 @@ app.post('/api/travel/uploadImage', function (req, res, next) {
 
   let newName = Math.random().toString(36).substring(2, 20) + Math.random().toString(36).substring(2, 20);
 
-  // Prende il nome dell'estensione da imgName
   let aus = imgName.split(".");
   let ext = aus[aus.length - 1];
 
@@ -831,7 +830,30 @@ app.get("/api/post/takePayedGroupByTravel", function (req: any, res: any, next) 
   });
 });
 
+app.post("/api/post/addImage", function (req: any, res: any, next) {
+  let img = req.body.img;
+  let imgName = req.body.name;
 
+  let newName = Math.random().toString(36).substring(2, 20) + Math.random().toString(36).substring(2, 20) + Math.random().toString(36).substring(2, 20);
+
+  let aus = imgName.split(".");
+  let ext = aus[aus.length - 1];
+
+  let imgData = img.replace(/^data:image\/\w+;base64,/, "");
+  let buffer = Buffer.from(imgData, "base64");
+  fs.writeFile("./static/SharedImages/" + newName + "." + ext, buffer, (err: any) => {
+    if (err) {
+      res.status(500);
+      res.send(err.message);
+      console.log(err.message);
+    }
+    else {
+      res.status(200);
+      res.send(newName + "." + ext);
+    }
+  });
+
+});
 // GESTIONE FOLLOW
 app.post("/api/follow/create", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("follow");
