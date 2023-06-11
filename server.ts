@@ -663,10 +663,11 @@ app.post("/api/post/updatePinPost", function (req: any, res: any, next) {
   let pinned = req.body.param.pinned;
 
   let collection = req["connessione"].db(DB_NAME).collection("posts");
-  collection.updateOne({ _id: new Object(id) }, { $set: { "pinned": pinned } }, function (err: any, data: any) {
+  collection.updateOne({ _id: new ObjectId(id) }, { $set: { "pinned": pinned } }, function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore esecuzione query");
     } else {
+      console.log("data: ", data);
       res.status(200).send(data);
     }
 
@@ -677,15 +678,35 @@ app.post("/api/post/updatePinPost", function (req: any, res: any, next) {
 app.post("/api/post/deletePost", function (req: any, res: any, next) {
   let id = req.body.id;
 
+  let collection0 = req["connessione"].db(DB_NAME).collection("posts");
   let collection = req["connessione"].db(DB_NAME).collection("posts");
-  collection.deleteOne({ _id: new ObjectId(id) }, function (err: any, data: any) {
+
+  collection0.findOne({ _id: new ObjectId(id) }, function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore esecuzione query");
     } else {
-      res.status(200).send(data);
-    }
+      if (data.type == "images") {
+        let path = data.source;
+        for (let item of path) {
+          fs.unlink(item, (err) => {
+            if (err) {
+              console.error(err)
+              return
+            }
+          })
+        }
+      }
 
-    req["connessione"].close();
+      collection.deleteOne({ _id: new ObjectId(id) }, function (err: any, data: any) {
+        if (err) {
+          res.status(500).send("Errore esecuzione query");
+        } else {
+          res.status(200).send(data);
+        }
+
+        req["connessione"].close();
+      });
+    }
   });
 });
 
@@ -841,7 +862,7 @@ app.post("/api/post/addImage", function (req: any, res: any, next) {
 
   let imgData = img.replace(/^data:image\/\w+;base64,/, "");
   let buffer = Buffer.from(imgData, "base64");
-  fs.writeFile("./static/SharedImages/" + newName + "." + ext, buffer, (err: any) => {
+  fs.writeFile("./static/userImage/posts/" + newName + "." + ext, buffer, (err: any) => {
     if (err) {
       res.status(500);
       res.send(err.message);
