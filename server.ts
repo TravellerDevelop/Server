@@ -680,20 +680,23 @@ app.post("/api/post/deletePost", function (req: any, res: any, next) {
 
   let collection0 = req["connessione"].db(DB_NAME).collection("posts");
   let collection = req["connessione"].db(DB_NAME).collection("posts");
-
+  console.log("id: ", id);
   collection0.findOne({ _id: new ObjectId(id) }, function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore esecuzione query");
     } else {
-      if (data.type == "images") {
-        let path = data.source;
-        for (let item of path) {
-          fs.unlink(item, (err) => {
-            if (err) {
-              console.error(err)
-              return
-            }
-          })
+      console.log("data: ", data)
+      if (typeof data.type != "undefined") {
+        if (data.type == "images") {
+          let path = data.source;
+          for (let item of path) {
+            fs.unlink(item, (err) => {
+              if (err) {
+                console.error(err)
+                return
+              }
+            })
+          }
         }
       }
 
