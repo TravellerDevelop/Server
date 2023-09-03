@@ -7,10 +7,7 @@ import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import express from "express"; // @types/express
 import cors from "cors"; // @types/cors
-import fileUpload, { UploadedFile } from "express-fileupload";
-import { RemoteSocket, Server, Socket } from "socket.io";
-import colors from "colors";
-import { isConstructorDeclaration } from "typescript";
+import { Server, Socket } from "socket.io";
 
 dotenv.config({ path: ".env" });
 
@@ -64,14 +61,12 @@ app.use("/", (req: any, res: any, next: any) => {
   next();
 });
 
-const whitelist = [];
-const corsOptions = {
+app.use("/", cors({
   origin: function (origin: any, callback: any) {
     return callback(null, true);
   },
   credentials: true,
-};
-app.use("/", cors(corsOptions));
+}));
 
 app.set("json spaces", 4);
 
@@ -405,8 +400,6 @@ app.post("/api/travel/update", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("travels");
   let param = req.body.param;
   let id = req.body.id;
-
-  console.log(param)
 
   collection.updateOne({ _id: new ObjectId(id) }, { $set: { name: param.name, description: param.description, budget: param.budget } }, function (err: any, data: any) {
     if (err) {
@@ -878,6 +871,22 @@ app.post("/api/post/addImage", function (req: any, res: any, next) {
   });
 
 });
+
+app.post("/api/post/updateToDo", function (req: any, res: any) {
+  let collection = req["connessione"].db(DB_NAME).collection("posts");
+
+  collection.updateOne({ _id: new ObjectId(req.body.id) }, {$set : {items : req.body.items}} , function (err: any, data: any) {
+    if (err) {
+      res.status(500).send("Errore aggiornamento item");
+    }
+    else {
+      res.status(200).send(data);
+    }
+
+    req["connessione"].close();
+  });
+})
+
 // GESTIONE FOLLOW
 app.post("/api/follow/create", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("follow");
@@ -1095,6 +1104,17 @@ app.post("/api/tickets/share", function (req: any, res: any, next) {
 })
 
 // Gestione socket
-io.on('connection', function (clientSocket) {
-  console.log(' User ' + clientSocket.id + ' isConnected!');
+io.on('connection', (socket: Socket) => {
+  console.log('A user connected');
+
+  // Esempio di gestione di un evento personalizzato
+  socket.on('custom-event', (data) => {
+    console.log('Received custom event:', data);
+    // Emetti un evento a tutti i client connessi
+    io.emit('custom-event', data);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected');
+  });
 });
