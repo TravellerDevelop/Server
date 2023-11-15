@@ -8,17 +8,23 @@ import dotenv from "dotenv";
 import express from "express"; // @types/express
 import cors from "cors"; // @types/cors
 import { Server, Socket } from "socket.io";
+import calculateResponseTimeMiddleware from "./util/responseTime";
+import { takeVersion, verifyConnection } from "./util/tests";
+import { fromIdToUsername, login, registerUser, takeTravelsNum, takeUserById, takeUserInfo, userTravels } from "./func/user";
+const NodeCache = require("node-cache");
 
 dotenv.config({ path: ".env" });
 
+const cache = new NodeCache({ stdTTL: 0, checkperiod: 120 });
 const app = express();
 const httpServer = http.createServer(app);
 const io = new Server(httpServer);
 const PORT = process.env.PORT || 1337;
-const DB_NAME = "traveller";
+export const DB_NAME = "traveller";
 const connectionString: any = process.env.connectionString;
 const fileupload = require('express-fileupload');
 const socket: any = [];
+const ISDEBUG = true;
 
 //CREAZIONE E AVVIO DEL SERVER HTTP
 let server = http.createServer(app);
@@ -27,7 +33,6 @@ let paginaErrore: string = "";
 server.listen(PORT, () => {
   init();
   console.log("Server in ascolto sulla porta " + PORT);
-  console.log(connectionString);
 });
 
 function init() {
@@ -42,7 +47,9 @@ function init() {
 
 /***********MIDDLEWARE****************/
 app.use("/", (req: any, res: any, next: any) => {
-  console.log(req.method + ": " + req.originalUrl);
+  if (ISDEBUG) {
+    console.log(req.method + ": " + req.originalUrl);
+  }
   next();
 });
 
@@ -52,13 +59,9 @@ app.use("/", express.json({ limit: "50mb" }));
 app.use("/", express.urlencoded({ limit: "50mb", extended: true }));
 
 app.use("/", (req: any, res: any, next: any) => {
-  if (Object.keys(req.query).length != 0) {
-    console.log("------> Parametri GET: " + JSON.stringify(req.query));
+  if (ISDEBUG) {
+    calculateResponseTimeMiddleware(req, res, next)
   }
-  if (Object.keys(req.body).length != 0) {
-    console.log("------> Parametri BODY: " + JSON.stringify(req.body));
-  }
-  next();
 });
 
 app.use("/", cors({
@@ -88,176 +91,41 @@ app.use(fileupload({
   "limits ": { "fileSize ": (20 * 1024 * 1024) } // 20 MB
 }));
 
+/* UTILITY */
+app.get("/api/verifyConnection", function (req: any, res: any) { verifyConnection(req, res); });
+app.get("/api/takeVersion", function (req: any, res: any) { takeVersion(req, res, cache) });
 
 /***********USER LISTENER****************/
-app.get("/api/verifyConnection", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("test");
-  collection.find({}).toArray(function (err: any, data: any) {
-    if (err) {
-      res.status(500).send("Errore nella connessione al database");
-    } else {
-      if (data.length != 0) {
-        res.status(200).send("Ok");
+app.get("/api/user/info", function (req: any, res: any) { takeUserInfo(req, res, cache); });
+app.get("/api/user/takeUserById", function (req: any, res: any) { takeUserById(req, res, cache); });
+app.post("/api/user/fromIdToUsernames", function (req: any, res: any) { fromIdToUsername(req, res, cache); });
+app.post("/api/user/register", function (req: any, res: any) { registerUser(req, res); });
+app.get("/api/user/takeTravelsNum", function (req: any, res: any) { takeTravelsNum(req, res, cache); });
+app.post("/api/user/login", function (req: any, res: any) { login(req, res, cache); });
+app.get("/api/user/travels", function (req: any, res: any) { userTravels(req, res, cache); });
+
+app.get("/api/user/search", function (req: any, res: any) {
+  let username = req.query.username;
+  let cachedData = cache.get("usr-search-keys=" + username);
+  if (cachedData) {
+    cache.set("usr-search-keys=" + username, cachedData, 100);
+    res.send(cachedData).status(200);
+  }
+  else {
+    let collection = req["connessione"].db(DB_NAME).collection("user");
+    const regex = new RegExp(username, 'i');
+    collection.find({ $or: [{ username: { $regex: regex } }, { name: { $regex: regex } }, { surname: { $regex: regex } }] }).limit(3).toArray(function (err: any, data: any) {
+      if (err) {
+        res.status(500).send("Errore esecuzione query");
       }
-    }
-    req["connessione"].close();
-  });
-});
-
-app.get("/api/takeVersion", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("test");
-
-  collection.find({ _id: new ObjectId("646f82d1e77fa64f3e358dd1") }).toArray(function (err: any, data: any) {
-    if (err) {
-      res.status(500).send("Errore nella connessione al database");
-    } else {
-      if (data.length != 0) {
+      else {
+        cache.set("usr-search-keys=", data, 100);
         res.status(200).send(data);
       }
-    }
-    req["connessione"].close();
-  });
-});
 
-app.get("/api/user/info", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("user");
-  let username = req.query.username;
-  collection.find({ username: username }).toArray(function (err: any, data: any) {
-    if (err) {
-      res.status(500).send("Errore esecuzione query");
-    } else {
-      res.send(data);
-    }
-    req["connessione"].close();
-  });
-});
-
-app.get("/api/user/takeUserById", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("user");
-  let id = req.query.id;
-
-  collection.find({ _id: new ObjectId(id) }).toArray(function (err: any, data: any) {
-    if (err) {
-      res.status(500).send("Errore esecuzione query");
-    } else {
-      res.send(data);
-    }
-    req["connessione"].close();
-  });
-});
-
-app.post("/api/user/fromIdToUsernames", function (req: any, res: any, next) {
-  let ausId = [];
-  for (let item of req.body.id) {
-    ausId.push(new ObjectId(item));
+      req["connessione"].close();
+    });
   }
-
-  let collection = req["connessione"].db(DB_NAME).collection("user");
-  let id = req.query.id;
-  collection.find({ _id: { $in: ausId } }).toArray(function (err: any, data: any) {
-    if (err) {
-      res.status(500).send("Errore esecuzione query");
-    } else {
-      res.send(data);
-    }
-    req["connessione"].close();
-  });
-});
-
-app.post("/api/user/register", function (req: any, res: any, next) {
-  let collection2 = req["connessione"].db(DB_NAME).collection("user");
-  collection2.find({ username: req.body.username }).toArray(function (err: any, data: any) {
-    if (err) {
-      res.status(500).send("Errore esecuzione query");
-      console.log("Errore esecuzione query 1");
-    } else {
-      if (data.length != 0) {
-        res.status(202).send("Username già in uso");
-      } else {
-        let collection = req["connessione"].db(DB_NAME).collection("user");
-        collection.insertOne(req.body, function (err: any, data: any) {
-          if (err) {
-            res.status(500).send("Errore esecuzione query");
-            console.log("Errore esecuzione query 2\n", err);
-          } else {
-            res.status(200).send(data);
-          }
-          req["connessione"].close();
-        });
-      }
-    }
-
-  });
-});
-
-app.get("/api/user/takeTravelsNum", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("travels");
-  let username = req.query.username;
-  collection.find({ "participants": { "$elemMatch": { "username": username, "creator": true } } }, { "participants.$": 1 }).toArray(function (err: any, data: any) {
-    if (err) {
-      res.status(500).send("Errore esecuzione query");
-    } else {
-      console.log(data.length.toString())
-      res.send(data.length.toString());
-    }
-
-    req["connessione"].close();
-  });
-});
-
-
-app.post("/api/user/login", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("user");
-  collection.find({ username: req.body.username }).toArray(function (err: any, data: any) {
-    if (err) {
-      res.status(500).send("Errore esecuzione query");
-    } else {
-      if (data.length == 0) {
-        res.status(202).send("Utente non trovato");
-      } else {
-        if (data[0].password == req.body.password) {
-          res.status(200).send(data);
-        } else {
-          res.status(201).send("Password errata");
-        }
-      }
-    }
-
-    req["connessione"].close();
-  });
-});
-
-app.get("/api/user/travels", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("travels");
-  let username = req.query.username;
-  collection.find({ creator: username }).toArray(function (err: any, data: any) {
-    if (err) {
-      req["connessione"].close();
-      res.status(500).send("Errore esecuzione query");
-    }
-    else {
-      req["connessione"].close();
-      res.status(200).send(data);
-    }
-    req["connessione"].close();
-  });
-
-});
-
-app.get("/api/user/search", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("user");
-  let username = req.query.username;
-  const regex = new RegExp(username, 'i');
-  collection.find({ $or: [{ username: { $regex: regex } }, { name: { $regex: regex } }, { surname: { $regex: regex } }] }).limit(3).toArray(function (err: any, data: any) {
-    if (err) {
-      res.status(500).send("Errore esecuzione query");
-    }
-    else {
-      res.status(200).send(data);
-    }
-
-    req["connessione"].close();
-  });
 });
 
 // GESTIONE TRAVELS
@@ -338,62 +206,81 @@ app.post("/api/travel/join", function (req: any, res: any, next) {
 app.get("/api/travel/takeJoined", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("travels");
   let username = req.query.username;
-  let userid = req.query.userid;
-
-  collection.find({ "participants.userid": userid, "participants.username": username, closed: false }).sort({ creation_date: -1 }).toArray(function (err: any, data: any) {
-    if (err) {
-      res.status(500).send("Errore esecuzione query");
-    }
-    else {
-      res.status(200).send(data);
-    }
-
-    req["connessione"].close();
-  });
-});
-
-app.get("/api/travel/takeParticipants", function (req: any, res: any, next) {
-  let travel = req.query.travel;
-
-  let collection = req["connessione"].db(DB_NAME).collection("travels");
-  collection.find({ code: travel }).toArray(function (err: any, data: any) {
-    if (err) {
-      res.status(500).send("Errore esecuzione query");
-    }
-    else {
-      let participants = [];
-
-      for (let item of data[0].participants) {
-        participants.push(item.username);
+  let cachedData = cache.get("joined-usn=" + username);
+  let userid = req.query.userid
+  if (cachedData) {
+    cache.set("joined-id=" + userid, cachedData, 100);
+    res.send(cachedData).status(200);
+  } else {
+    collection.find({ "participants.userid": userid, "participants.username": username, closed: false }).sort({ creation_date: -1 }).toArray(function (err: any, data: any) {
+      if (err) {
+        res.status(500).send("Errore esecuzione query");
+      }
+      else {
+        cache.set("joined-id=" + userid, data, 100);
+        res.status(200).send(data);
       }
 
-      let collection2 = req["connessione"].db(DB_NAME).collection("user");
-      collection2.find({ username: { $in: participants } }).toArray(function (err: any, data: any) {
-        if (err) {
-          res.status(500).send("Errore esecuzione query");
-        }
-        else {
-          res.status(200).send(data);
-        }
-        req["connessione"].close();
-      });
-    }
-  });
+      req["connessione"].close();
+    });
+  }
 });
 
-app.get("/api/travel/takeByCreator", function (req: any, res: any, next) {
+app.get("/api/travel/takeParticipants", function (req: any, res: any) {
+  let travel = req.query.travel;
+  let cachedData = cache.get("takeParticipants=" + travel);
   let collection = req["connessione"].db(DB_NAME).collection("travels");
-  let username = req.query.username;
-  collection.find({ "participants": { "$elemMatch": { "username": username, "creator": true } } }, { "participants.$": 1 }).sort({ creation_date: -1 }).toArray(function (err: any, data: any) {
-    if (err) {
-      res.status(500).send("Errore esecuzione query");
-    }
-    else {
-      res.status(200).send(data);
-    }
+  if (cachedData) {
+    cache.set("takeParticipants=" + travel, cachedData, 600);
+    res.send(cachedData).status(200);
+  } else {
+    collection.find({ code: travel }).toArray(function (err: any, data: any) {
+      if (err) {
+        res.status(500).send("Errore esecuzione query");
+      }
+      else {
+        let participants = [];
 
-    req["connessione"].close();
-  });
+        for (let item of data[0].participants) {
+          participants.push(item.username);
+        }
+
+        let collection2 = req["connessione"].db(DB_NAME).collection("user");
+        collection2.find({ username: { $in: participants } }).toArray(function (err: any, data: any) {
+          if (err) {
+            res.status(500).send("Errore esecuzione query");
+          }
+          else {
+            cache.set("takeParticipants=" + travel, data, 600);
+            res.status(200).send(data);
+          }
+          req["connessione"].close();
+        });
+      }
+    });
+  }
+});
+
+app.get("/api/travel/takeByCreator", function (req: any, res: any) {
+  let username = req.query.username;
+  let cachedData = cache.get("takeByCreator=" + username);
+  let collection = req["connessione"].db(DB_NAME).collection("travels");
+  if (cachedData) {
+    cache.set("takeByCreator=" + username, cachedData, 600);
+    res.send(cachedData).status(200);
+  } else {
+    collection.find({ "participants": { "$elemMatch": { "username": username, "creator": true } } }, { "participants.$": 1 }).sort({ creation_date: -1 }).toArray(function (err: any, data: any) {
+      if (err) {
+        res.status(500).send("Errore esecuzione query");
+      }
+      else {
+        cache.set("takeByCreator=" + username, data, 600);
+        res.status(200).send(data);
+      }
+
+      req["connessione"].close();
+    });
+  }
 });
 
 app.post("/api/travel/update", function (req: any, res: any, next) {
@@ -408,7 +295,6 @@ app.post("/api/travel/update", function (req: any, res: any, next) {
     else {
       res.status(200).send(data);
     }
-
     req["connessione"].close();
   });
 });
@@ -562,19 +448,27 @@ app.post("/api/post/create", function (req: any, res: any, next) {
   });
 });
 
-app.get("/api/post/take", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("posts");
+app.get("/api/post/take", function (req: any, res: any) {
   let travel = req.query.travel;
-  collection.find({ travel: travel }).sort({ dateTime: -1 }).toArray(function (err: any, data: any) {
-    if (err) {
-      res.status(500).send("Errore esecuzione query");
-    }
-    else {
-      res.status(200).send(data);
-    }
-
-    req["connessione"].close();
-  });
+  let cachedData = cache.get("travel-post="+travel);
+  if(cachedData){
+    res.send(cachedData).status(200)
+    cache.set("travel-post="+travel, cachedData, 600);
+  }
+  else{
+    let collection = req["connessione"].db(DB_NAME).collection("posts");
+    collection.find({ travel: travel }).sort({ dateTime: -1 }).toArray(function (err: any, data: any) {
+      if (err) {
+        res.status(500).send("Errore esecuzione query");
+      }
+      else {
+        cache.set("travel-post="+travel, data, 600);
+        res.status(200).send(data);
+      }
+  
+      req["connessione"].close();
+    });
+  }
 });
 
 app.post("/api/post/updateVote", function (req: any, res: any, next) {
@@ -875,7 +769,7 @@ app.post("/api/post/addImage", function (req: any, res: any, next) {
 app.post("/api/post/updateToDo", function (req: any, res: any) {
   let collection = req["connessione"].db(DB_NAME).collection("posts");
 
-  collection.updateOne({ _id: new ObjectId(req.body.id) }, {$set : {items : req.body.items}} , function (err: any, data: any) {
+  collection.updateOne({ _id: new ObjectId(req.body.id) }, { $set: { items: req.body.items } }, function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore aggiornamento item");
     }
