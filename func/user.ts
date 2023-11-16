@@ -1,6 +1,6 @@
-import { Collection, ObjectId } from "mongodb";
-import { DB_NAME } from "../server";
+import { ObjectId } from "mongodb";
 import NodeCache from "node-cache";
+import { DB_NAME } from "../server";
 
 export function takeUserInfo(req: any, res: any, cache: NodeCache) {
     let username = req.query.username;
@@ -133,9 +133,9 @@ export function login(req: any, res: any, cache: NodeCache) {
 
 export function userTravels(req: any, res: any, cache: NodeCache) {
     let username = req.query.username;
-    let cachedData = cache.get("userTravels-usn="+username);
-    if(cachedData){
-        cache.set("userTravels-usn="+username, cachedData, 600);
+    let cachedData = cache.get("userTravels-usn=" + username);
+    if (cachedData) {
+        cache.set("userTravels-usn=" + username, cachedData, 600);
         res.send(cachedData).status(200);
     }
     let collection = req["connessione"].db(DB_NAME).collection("travels");
@@ -145,10 +145,34 @@ export function userTravels(req: any, res: any, cache: NodeCache) {
             res.status(500).send("Errore esecuzione query");
         }
         else {
-            cache.set("userTravels-usn="+username, data, 600);
+            cache.set("userTravels-usn=" + username, data, 600);
             req["connessione"].close();
             res.status(200).send(data);
         }
         req["connessione"].close();
     });
+}
+
+export function searchUser(req: any, res: any, cache: any) {
+    let username = req.query.username;
+    let cachedData = cache.get("usr-search-keys=" + username);
+    if (cachedData) {
+        cache.set("usr-search-keys=" + username, cachedData, 100);
+        res.send(cachedData).status(200);
+    }
+    else {
+        let collection = req["connessione"].db(DB_NAME).collection("user");
+        const regex = new RegExp(username, 'i');
+        collection.find({ $or: [{ username: { $regex: regex } }, { name: { $regex: regex } }, { surname: { $regex: regex } }] }).limit(3).toArray(function (err: any, data: any) {
+            if (err) {
+                res.status(500).send("Errore esecuzione query");
+            }
+            else {
+                cache.set("usr-search-keys=", data, 100);
+                res.status(200).send(data);
+            }
+
+            req["connessione"].close();
+        });
+    }
 }
