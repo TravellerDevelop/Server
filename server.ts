@@ -27,7 +27,7 @@ export const DB_NAME = "traveller";
 const connectionString: any = process.env.connectionString;
 const fileupload = require('express-fileupload');
 const socket: any = [];
-const ISDEBUG = true;
+export const ISDEBUG = true;
 
 //CREAZIONE E AVVIO DEL SERVER HTTP
 let server = http.createServer(app);
