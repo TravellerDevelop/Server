@@ -26,9 +26,17 @@
     "typescript": "^4.5.4"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
     "start": "nodemon server.ts"
   },
   "author": "Pietro Bossolasco",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/preset-env": "^7.23.3",
+    "@babel/preset-typescript": "^7.23.3",
+    "@types/jest": "^29.5.8",
+    "babel": "^6.23.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1"
+  }
 }
