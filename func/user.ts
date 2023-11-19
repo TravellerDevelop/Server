@@ -95,19 +95,22 @@ export function takeTravelsNum(req: any, res: any, cache: NodeCache) {
     let cachedData = cache.get("travelsNum-id=" + username);
     if (cachedData) {
         cache.set("travelsNum-id=" + username, cachedData, 600);
+        console.log("Cached: ", cachedData)
         res.send(cachedData).status(200);
     }
-    let collection = req["connessione"].db(DB_NAME).collection("travels");
-    collection.find({ "participants": { "$elemMatch": { "username": username, "creator": true } } }, { "participants.$": 1 }).toArray(function (err: any, data: any) {
-        if (err) {
-            res.status(500).send("Errore esecuzione query");
-        } else {
-            cache.set("travelsNum-id=" + username, data.length.toString(), 600);
-            res.send(data.length.toString()).status(200);
-        }
+    else {
+        let collection = req["connessione"].db(DB_NAME).collection("travels");
+        collection.find({ "participants": { "$elemMatch": { "username": username, "creator": true } } }, { "participants.$": 1 }).toArray(function (err: any, data: any) {
+            if (err) {
+                res.status(500).send("Errore esecuzione query");
+            } else {
+                cache.set("travelsNum-id=" + username, { count: data.length.toString() }, 600);
+                res.send({ count: data.length.toString() }).status(200);
+            }
 
-        req["connessione"].close();
-    });
+            req["connessione"].close();
+        });
+    }
 }
 
 export function login(req: any, res: any, cache: NodeCache) {
