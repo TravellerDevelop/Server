@@ -332,9 +332,7 @@ app.get("/api/follow/takeFromTo", function (req: any, res: any, next) {
   let from = req.query.from;
   let to = req.query.to;
 
-  let collection = req["connessione"].db(DB_NAME).collection("follow");
-
-  collection.find({ from: from, to: to }).toArray(function (err: any, data: any) {
+  req["connessione"].db(DB_NAME).collection("follow").find({ from: from, to: to }).toArray(function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore esecuzione query");
     }
