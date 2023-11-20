@@ -27,7 +27,7 @@ export const DB_NAME = "traveller";
 const connectionString: any = process.env.connectionString;
 const fileupload = require('express-fileupload');
 const socket: any = [];
-export const ISDEBUG = true;
+export const ISDEBUG = false;
 
 //CREAZIONE E AVVIO DEL SERVER HTTP
 let server = http.createServer(app);
@@ -49,13 +49,6 @@ function init() {
 }
 
 /***********MIDDLEWARE****************/
-app.use("/", (req: any, res: any, next: any) => {
-  if (ISDEBUG) {
-    console.log(req.method + ": " + req.originalUrl);
-  }
-  next();
-});
-
 app.use("/", express.static("./static"));
 
 app.use("/", express.json({ limit: "50mb" }));
