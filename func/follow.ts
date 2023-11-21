@@ -19,7 +19,6 @@ export function takeFollowers(req, res, cache) {
                 res.status(200).send(data);
                 cache.set("followers=" + to, data, 600);
             }
-            req["connessione"].close();
         })
     }
 }
@@ -39,8 +38,6 @@ export function takeFollowings(req, res, cache) {
                 res.status(200).send(data);
                 cache.set("followings=" + from, data, 600);
             }
-
-            req["connessione"].close();
         })
     }
 }
@@ -70,8 +67,6 @@ export function takeFollowingsWithInfo(req, res, cache) {
                         res.status(200).send(data);
                         cache.set("followingsWithInfo=" + from, data, 600);
                     }
-
-                    req["connessione"].close();
                 });
             }
         })
