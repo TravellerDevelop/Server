@@ -2,13 +2,14 @@ import { ObjectId } from "mongodb";
 import NodeCache from "node-cache";
 import { DB_NAME } from "../server";
 
-export function takeUserInfo(req: any, res: any, cache: NodeCache) {
+export function takeUserInfo(req: any, res: any, cache: NodeCache, next) {
     let username = req.query.username;
     let cachedData = cache.get("user-usn=" + username);
 
     if (cachedData) {
         cache.set("user-usn=" + username, cachedData, 600);
         res.send(cachedData).status(200);
+        next();
     }
     else {
         let collection = req["connessione"].db(DB_NAME).collection("user");
@@ -19,16 +20,18 @@ export function takeUserInfo(req: any, res: any, cache: NodeCache) {
                 cache.set("user-usn=" + username, cachedData, 600);
                 res.send(data);
             }
+            next();
         });
     }
 }
 
-export function takeUserById(req: any, res: any, cache: any) {
+export function takeUserById(req: any, res: any, cache: any, next) {
     let cachedData = cache.get("user-id=" + req.query.id);
 
     if (cachedData) {
         cache.set("user-id=" + req.query.id, cachedData, 600);
         res.send(cachedData).status(200);
+        next();
     }
     else {
         let collection = req["connessione"].db(DB_NAME).collection("user");
@@ -41,11 +44,12 @@ export function takeUserById(req: any, res: any, cache: any) {
                 cache.set("user-id=" + req.query.id, data, 600);
                 res.send(data);
             }
+            next();
         });
     }
 }
 
-export function fromIdToUsername(req: any, res: any, cache: any) {
+export function fromIdToUsername(req: any, res: any, cache: any, next) {
     let ausId = [];
     for (let item of req.body.id) {
         ausId.push(new ObjectId(item));
@@ -58,15 +62,17 @@ export function fromIdToUsername(req: any, res: any, cache: any) {
         } else {
             res.send(data);
         }
+        next();
     });
 }
 
-export function registerUser(req: any, res: any) {
+export function registerUser(req: any, res: any, next) {
     let collection2 = req["connessione"].db(DB_NAME).collection("user");
     collection2.find({ username: req.body.username }).toArray(function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query");
             console.log("Errore esecuzione query 1");
+            next();
         } else {
             if (data.length != 0) {
                 res.status(202).send("Username già in uso");
@@ -79,6 +85,7 @@ export function registerUser(req: any, res: any) {
                     } else {
                         res.status(200).send(data);
                     }
+                    next();
                 });
             }
         }
@@ -86,13 +93,13 @@ export function registerUser(req: any, res: any) {
     });
 }
 
-export function takeTravelsNum(req: any, res: any, cache: NodeCache) {
+export function takeTravelsNum(req: any, res: any, cache: NodeCache, next) {
     let username = req.query.username;
     let cachedData = cache.get("travelsNum-id=" + username);
     if (cachedData) {
         cache.set("travelsNum-id=" + username, cachedData, 600);
-        console.log("Cached: ", cachedData)
         res.send(cachedData).status(200);
+        next();
     }
     else {
         let collection = req["connessione"].db(DB_NAME).collection("travels");
@@ -103,16 +110,17 @@ export function takeTravelsNum(req: any, res: any, cache: NodeCache) {
                 cache.set("travelsNum-id=" + username, { count: data.length.toString() }, 600);
                 res.send({ count: data.length.toString() }).status(200);
             }
-
+            next();
         });
     }
 }
 
-export function login(req: any, res: any, cache: NodeCache) {
+export function login(req: any, res: any, cache: NodeCache, next) {
     let collection = req["connessione"].db(DB_NAME).collection("user");
     collection.find({ username: req.body.username }).toArray(function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query");
+            next();
         } else {
             if (data.length == 0) {
                 res.status(202).send("Utente non trovato");
@@ -122,17 +130,19 @@ export function login(req: any, res: any, cache: NodeCache) {
                 } else {
                     res.status(201).send("Password errata");
                 }
+                next();
             }
         }
     });
 }
 
-export function userTravels(req: any, res: any, cache: NodeCache) {
+export function userTravels(req: any, res: any, cache: NodeCache, next) {
     let username = req.query.username;
     let cachedData = cache.get("userTravels-usn=" + username);
     if (cachedData) {
         cache.set("userTravels-usn=" + username, cachedData, 600);
         res.send(cachedData).status(200);
+        next();
     }
     let collection = req["connessione"].db(DB_NAME).collection("travels");
     collection.find({ creator: username }).toArray(function (err: any, data: any) {
@@ -143,15 +153,17 @@ export function userTravels(req: any, res: any, cache: NodeCache) {
             cache.set("userTravels-usn=" + username, data, 600);
             res.status(200).send(data);
         }
+        next();
     });
 }
 
-export function searchUser(req: any, res: any, cache: any) {
+export function searchUser(req: any, res: any, cache: any, next) {
     let username = req.query.username;
     let cachedData = cache.get("usr-search-keys=" + username);
     if (cachedData) {
         cache.set("usr-search-keys=" + username, cachedData, 100);
         res.send(cachedData).status(200);
+        next();
     }
     else {
         let collection = req["connessione"].db(DB_NAME).collection("user");
@@ -164,6 +176,7 @@ export function searchUser(req: any, res: any, cache: any) {
                 cache.set("usr-search-keys=", data, 100);
                 res.status(200).send(data);
             }
+            next();
         });
     }
 }

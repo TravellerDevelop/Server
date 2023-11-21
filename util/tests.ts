@@ -2,25 +2,27 @@ import { ObjectId } from "mongodb";
 import { DB_NAME } from "../server";
 import NodeCache from "node-cache";
 
-export function verifyConnection(req: Request, res: any) {
+export function verifyConnection(req: Request, res: any, next: any) {
     let collection = req["connessione"].db(DB_NAME).collection("test");
     collection.find({}).toArray(function (err: any, data: any) {
         if (err) {
+            console.log(err)
             res.status(500).send("Errore nella connessione al database");
         } else {
             if (data.length != 0) {
                 res.status(200).send("Ok");
             }
         }
-        req["connessione"].close();
+        next();
     });
 }
 
-export function takeVersion(req: Request, res: any, cache: NodeCache) {
+export function takeVersion(req: Request, res: any, cache: NodeCache, next:any) {
     let cachedData = cache.get("app_version");
     if (cachedData) {
         cache.set("app-version", cachedData)
         res.send(cachedData).status(200);
+        next();
     }
     else {
         let collection = req["connessione"].db(DB_NAME).collection("test");
@@ -31,9 +33,9 @@ export function takeVersion(req: Request, res: any, cache: NodeCache) {
                 if (data.length != 0) {
                     cache.set("app-version", cachedData)
                     res.status(200).send(data);
+                    next();
                 }
             }
-            req["connessione"].close();
         });
     }
 }
