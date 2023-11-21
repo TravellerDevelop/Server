@@ -90,39 +90,39 @@ app.use(fileupload({
 }));
 
 /* UTILITY */
-app.get("/api/verifyConnection", (req: any, res: any) => { verifyConnection(req, res); });
-app.get("/api/takeVersion", (req: any, res: any) => { takeVersion(req, res, cache) });
+app.get("/api/verifyConnection", (req: any, res: any, next:any) => { verifyConnection(req, res);next();});
+app.get("/api/takeVersion", (req: any, res: any, next:any) => { takeVersion(req, res, cache);next(); });
 
 /***********USER LISTENER****************/
-app.get("/api/user/info", (req: any, res: any) => { takeUserInfo(req, res, cache); });
-app.get("/api/user/takeUserById", (req: any, res: any) => { takeUserById(req, res, cache); });
-app.post("/api/user/fromIdToUsernames", function (req: any, res: any) { fromIdToUsername(req, res, cache); });
-app.post("/api/user/register", function (req: any, res: any) { registerUser(req, res); });
-app.get("/api/user/takeTravelsNum", function (req: any, res: any) { takeTravelsNum(req, res, cache); });
-app.post("/api/user/login", function (req: any, res: any) { login(req, res, cache); });
-app.get("/api/user/travels", function (req: any, res: any) { userTravels(req, res, cache); });
-app.get("/api/user/search", function (req: any, res: any) { searchUser(req, res, cache); });
+app.get("/api/user/info", (req: any, res: any, next:any) => { takeUserInfo(req, res, cache);next(); });
+app.get("/api/user/takeUserById", (req: any, res: any, next:any) => { takeUserById(req, res, cache);next(); });
+app.post("/api/user/fromIdToUsernames", function (req: any, res: any, next:any) { fromIdToUsername(req, res, cache);next(); });
+app.post("/api/user/register", function (req: any, res: any, next:any) { registerUser(req, res);next(); });
+app.get("/api/user/takeTravelsNum", function (req: any, res: any, next:any) { takeTravelsNum(req, res, cache);next(); });
+app.post("/api/user/login", function (req: any, res: any, next:any) { login(req, res, cache);next(); });
+app.get("/api/user/travels", function (req: any, res: any, next:any) { userTravels(req, res, cache);next(); });
+app.get("/api/user/search", function (req: any, res: any, next:any) { searchUser(req, res, cache);next(); });
 
 // GESTIONE TRAVELS
-app.post("/api/travel/create", function (req: any, res: any) { createTravel(req, res, cache); });
-app.post("/api/travel/join", function (req: any, res: any) { joinTravel(req, res, cache); });
-app.get("/api/travel/takeJoined", function (req: any, res: any) { takeJoinedTravels(req, res, cache); });
-app.get("/api/travel/takeParticipants", (req: any, res: any) => { takeTravelsParticipants(req, res, cache) });
-app.get("/api/travel/takeByCreator", function (req: any, res: any) { takeTravelByCreator(req, res, cache) });
-app.post("/api/travel/update", function (req: any, res: any) { updateTravel(req, res); });
-app.post("/api/travel/close", function (req: any, res: any) { closeTravel(req, res) });
-app.post("/api/travel/delete", function (req: any, res: any) { deleteTravel(req, res) });
-app.post("/api/travel/leave", function (req: any, res: any) { leaveTravel(req, res, cache) });
-app.post('/api/travel/uploadImage', function (req, res) { uploadImage(req, res) })
+app.post("/api/travel/create", function (req: any, res: any, next:any) { createTravel(req, res, cache);next(); });
+app.post("/api/travel/join", function (req: any, res: any, next:any) { joinTravel(req, res, cache);next(); });
+app.get("/api/travel/takeJoined", function (req: any, res: any, next:any) { takeJoinedTravels(req, res, cache);next(); });
+app.get("/api/travel/takeParticipants", (req: any, res: any, next:any) => { takeTravelsParticipants(req, res, cache);next(); });
+app.get("/api/travel/takeByCreator", function (req: any, res: any, next:any) { takeTravelByCreator(req, res, cache);next(); });
+app.post("/api/travel/update", function (req: any, res: any, next:any) { updateTravel(req, res);next(); });
+app.post("/api/travel/close", function (req: any, res: any, next:any) { closeTravel(req, res);next(); });
+app.post("/api/travel/delete", function (req: any, res: any, next:any) { deleteTravel(req, res);next(); });
+app.post("/api/travel/leave", function (req: any, res: any, next:any) { leaveTravel(req, res, cache);next(); });
+app.post('/api/travel/uploadImage', function (req, res, next:any) { uploadImage(req, res);next(); })
 
 // GESTIONE DEI POST
-app.post("/api/post/create", function (req: any, res: any) { createPost(req, res, cache); });
-app.get("/api/post/take", function (req: any, res: any) { takePosts(req, res, cache); });
-app.post("/api/post/updateVote", function (req: any, res: any) { updateVote(req, res) });
-app.get("/api/post/takeLastsByUsername", function (req: any, res: any) { takeLastsPostByUsername(req, res, cache); });
-app.post("/api/post/updatePayment", function (req: any, res: any) { updatePayment(req, res); });
-app.post("/api/post/updatePinPost", function (req: any, res: any) { updatePinPost(req, res); });
-app.post("/api/post/deletePost", function (req: any, res: any) { deletePost(req, res); });
+app.post("/api/post/create", function (req: any, res: any, next:any) { createPost(req, res, cache);next(); });
+app.get("/api/post/take", function (req: any, res: any, next:any) { takePosts(req, res, cache);next(); });
+app.post("/api/post/updateVote", function (req: any, res: any, next:any) { updateVote(req, res);next(); });
+app.get("/api/post/takeLastsByUsername", function (req: any, res: any, next:any) { takeLastsPostByUsername(req, res, cache);next(); });
+app.post("/api/post/updatePayment", function (req: any, res: any, next:any) { updatePayment(req, res);next(); });
+app.post("/api/post/updatePinPost", function (req: any, res: any, next:any) { updatePinPost(req, res);next(); });
+app.post("/api/post/deletePost", function (req: any, res: any, next:any) { deletePost(req, res);next(); });
 
 app.get("/api/post/takeTotalExpenses", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("posts");
@@ -484,4 +484,8 @@ io.on('connection', (socket: Socket) => {
   socket.on('disconnect', () => {
     console.log('User disconnected');
   });
+});
+
+app.use("/api/", function (req: any, res: any, next) {
+  req["connessione"].close();
 });

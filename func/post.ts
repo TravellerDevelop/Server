@@ -14,7 +14,6 @@ export function createPost(req, res, cache) {
             res.status(200).send(data);
         }
         cache.del("travel-post=" + param.travel);
-        req["connessione"].close();
     });
 }
 
@@ -35,8 +34,6 @@ export function takePosts(req, res, cache) {
                 cache.set("travel-post=" + travel, data, 600);
                 res.status(200).send(data);
             }
-
-            req["connessione"].close();
         });
     }
 }
@@ -52,8 +49,6 @@ export function updateVote(req, res) {
         } else {
             res.status(200).send(data);
         }
-
-        req["connessione"].close();
     });
 }
 
@@ -64,7 +59,6 @@ export function takeLastsPostByUsername(req, res, cache) {
         if (err) {
             console.log("Errore esecuzione query");
             res.status(500).send("Errore esecuzione query");
-            req["connessione"].close();
         }
         else {
             let ausData = [];
@@ -78,7 +72,6 @@ export function takeLastsPostByUsername(req, res, cache) {
                     console.log("Errore esecuzione query 2");
                     console.log(err)
                     res.status(500).send("Errore esecuzione query");
-                    req["connessione"].close();
                 }
                 else {
                     let otherData = {}
@@ -87,7 +80,6 @@ export function takeLastsPostByUsername(req, res, cache) {
                     }
 
                     res.status(200).send([data, otherData]);
-                    req["connessione"].close();
                 }
             });
         }
@@ -103,8 +95,6 @@ export function updatePayment(req, res) {
         } else {
             res.status(200).send(data);
         }
-
-        req["connessione"].close();
     });
 }
 
@@ -120,8 +110,6 @@ export function updatePinPost(req, res) {
             console.log("data: ", data);
             res.status(200).send(data);
         }
-
-        req["connessione"].close();
     });
 }
 
@@ -151,8 +139,6 @@ export function deletePost(req, res) {
                 } else {
                     res.status(200).send(data);
                 }
-
-                req["connessione"].close();
             });
         }
     });

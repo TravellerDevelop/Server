@@ -14,8 +14,6 @@ export function createTravel(req: any, res: any, cache: any) {
         } else {
             res.status(200).send(data);
         }
-
-        req["connessione"].close();
     });
 }
 
@@ -26,30 +24,25 @@ export function joinTravel(req: any, res: any, cache: NodeCache) {
         .toArray(function (err: any, data: any) {
             if (err) {
                 res.status(500).send("Errore esecuzione query");
-                req["connessione"].close();
                 error = true;
             } else {
                 if (data.length == 1) {
                     if (data[0].creator == req.body.username) {
                         res.status(201).send("Non puoi iscriverti al tuo viaggio");
-                        req["connessione"].close();
                         error = true;
                     } else {
                         for (let item of data[0].participants) {
                             if (item.userid == req.body.userid) {
                                 res.status(202).send("Sei già iscritto a questo viaggio");
-                                req["connessione"].close();
                                 error = true;
                             }
                         }
 
                         if (data[0].participants.includes({ userid: req.body.userid, username: req.body.username })) {
                             res.status(202).send("Sei già iscritto a questo viaggio");
-                            req["connessione"].close();
                             error = true;
                         } else {
                             if (data[0].new_members_allowed == "0") {
-                                req["connessione"].close();
                                 res.status(203).send("Non puoi iscriverti a questo viaggio");
                                 error = true;
                             }
@@ -61,7 +54,6 @@ export function joinTravel(req: any, res: any, cache: NodeCache) {
                                         } else {
                                             res.status(200).send(data);
                                         }
-                                        req["connessione"].close();
                                     });
                                 }
                             }
@@ -70,7 +62,6 @@ export function joinTravel(req: any, res: any, cache: NodeCache) {
                 } else {
                     res.status(201).send("Codice viaggio non valido");
                     error = true;
-                    req["connessione"].close();
                 }
             }
         });
@@ -92,8 +83,6 @@ export function takeJoinedTravels(req: any, res: any, cache: any) {
                 cache.set("joined-id=" + userid, data, 100);
                 res.status(200).send(data);
             }
-
-            req["connessione"].close();
         });
     }
 }
@@ -126,7 +115,6 @@ export function takeTravelsParticipants(req: any, res: any, cache: any) {
                         cache.set("takeParticipants=" + travel, data, 600);
                         res.status(200).send(data);
                     }
-                    req["connessione"].close();
                 });
             }
         });
@@ -149,8 +137,6 @@ export function takeTravelByCreator(req: any, res: any, cache: any) {
                 cache.set("takeByCreator=" + username, data, 600);
                 res.status(200).send(data);
             }
-
-            req["connessione"].close();
         });
     }
 }
@@ -166,7 +152,6 @@ export function updateTravel(req: any, res: any) {
         else {
             res.status(200).send(data);
         }
-        req["connessione"].close();
     });
 }
 
@@ -177,8 +162,6 @@ export function closeTravel(req: any, res: any) {
             res.status(500).send("Errore esecuzione query 1");
         }
         else { res.status(200).send(data); }
-
-        req["connessione"].close();
     });
 }
 
@@ -208,7 +191,6 @@ export function deleteTravel(req: any, res: any) {
                         else {
                             res.status(200).send(data);
                         }
-                        req["connessione"].close();
                     })
                 }
             });
@@ -222,7 +204,6 @@ export function leaveTravel(req: any, res: any, cache: any) {
 
     req["connessione"].db(DB_NAME).collection("travels").findOne({ _id: new ObjectId(travel) }, function (err: any, data: any) {
         if (err) {
-            req["connessione"].close();
             res.status(500).send("Errore esecuzione query 1");
         }
         else {
@@ -239,7 +220,6 @@ export function leaveTravel(req: any, res: any, cache: any) {
                             else {
                                 res.status(200).send(data);
                             }
-                            req["connessione"].close();
                         })
                     }
                 });
@@ -253,8 +233,6 @@ export function leaveTravel(req: any, res: any, cache: any) {
                     else {
                         res.status(200).send(data);
                     }
-
-                    req["connessione"].close();
                 });
             }
         }

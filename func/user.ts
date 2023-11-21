@@ -14,12 +14,11 @@ export function takeUserInfo(req: any, res: any, cache: NodeCache) {
         let collection = req["connessione"].db(DB_NAME).collection("user");
         collection.find({ username: username }).toArray(function (err: any, data: any) {
             if (err) {
-                res.status(500).send("Errore esecuzione query");
+                res.status(500).send({res : "Errore esecuzione query\n" + JSON.stringify(err)});
             } else {
                 cache.set("user-usn=" + username, cachedData, 600);
                 res.send(data);
             }
-            req["connessione"].close();
         });
     }
 }
@@ -42,7 +41,6 @@ export function takeUserById(req: any, res: any, cache: any) {
                 cache.set("user-id=" + req.query.id, data, 600);
                 res.send(data);
             }
-            req["connessione"].close();
         });
     }
 }
@@ -60,7 +58,6 @@ export function fromIdToUsername(req: any, res: any, cache: any) {
         } else {
             res.send(data);
         }
-        req["connessione"].close();
     });
 }
 
@@ -82,7 +79,6 @@ export function registerUser(req: any, res: any) {
                     } else {
                         res.status(200).send(data);
                     }
-                    req["connessione"].close();
                 });
             }
         }
@@ -108,7 +104,6 @@ export function takeTravelsNum(req: any, res: any, cache: NodeCache) {
                 res.send({ count: data.length.toString() }).status(200);
             }
 
-            req["connessione"].close();
         });
     }
 }
@@ -129,8 +124,6 @@ export function login(req: any, res: any, cache: NodeCache) {
                 }
             }
         }
-
-        req["connessione"].close();
     });
 }
 
@@ -144,15 +137,12 @@ export function userTravels(req: any, res: any, cache: NodeCache) {
     let collection = req["connessione"].db(DB_NAME).collection("travels");
     collection.find({ creator: username }).toArray(function (err: any, data: any) {
         if (err) {
-            req["connessione"].close();
             res.status(500).send("Errore esecuzione query");
         }
         else {
             cache.set("userTravels-usn=" + username, data, 600);
-            req["connessione"].close();
             res.status(200).send(data);
         }
-        req["connessione"].close();
     });
 }
 
@@ -174,8 +164,6 @@ export function searchUser(req: any, res: any, cache: any) {
                 cache.set("usr-search-keys=", data, 100);
                 res.status(200).send(data);
             }
-
-            req["connessione"].close();
         });
     }
 }
