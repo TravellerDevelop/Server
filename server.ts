@@ -58,6 +58,9 @@ app.use("/", (req: any, res: any, next: any) => {
   if (ISDEBUG) {
     calculateResponseTimeMiddleware(req, res, next)
   }
+  else{
+    next();
+  }
 });
 
 app.use("/", cors({
