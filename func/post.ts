@@ -2,6 +2,7 @@ import { ObjectId } from "mongodb";
 import NodeCache from "node-cache";
 import { DB_NAME } from "../server";
 import fs from "fs";
+import axios from "axios";
 
 export function createPost(req, res, cache, next) {
     let collection = req["connessione"].db(DB_NAME).collection("posts");
@@ -10,11 +11,36 @@ export function createPost(req, res, cache, next) {
     collection.insertOne(param, function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query");
+            next();
         } else {
-            res.status(200).send(data);
+            req["connessione"].db(DB_NAME).collection('travels').findOne({ _id: new ObjectId(param.travel) }, (err: any, data: any) => {
+                let part = [];
+                for (let item of data.participants) {
+                    part = [...part, item.userid];
+                    req["connessione"].db(DB_NAME).collection('user').findOne({ _id: new ObjectId(item.travel) },async (err: any, data: any) => {
+                        for (let item of data.notifToken) {
+                            const expoPushToken = item;
+                            const message = {
+                                to: expoPushToken,
+                                sound: 'default',
+                                title: param.creator + ' ha pubblicato qualcosa! 🪁🪁',
+                                body: 'Vai subito a vedere!!',
+                                data: { additionalData: 'data opzionale' },
+                            };
+                            try {
+                                const response = await axios.post('https://exp.host/--/api/v2/push/send', message);
+                                console.log('Notifica inviata con successo:', response.data);
+                            } catch (error) {
+                                console.error('Errore nell\'invio della notifica:', error);
+                            }
+                        }
+                    })
+                }
+            })
+
+            // res.status(200).send(data);
         }
         cache.del("travel-post=" + param.travel);
-        next();
     });
 }
 
