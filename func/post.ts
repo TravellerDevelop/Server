@@ -3,11 +3,16 @@ import NodeCache from "node-cache";
 import { DB_NAME } from "../server";
 import fs from "fs";
 import axios from "axios";
+import { Expo } from 'expo-server-sdk';
+
+let expo = new Expo();
 
 export function createPost(req, res, cache, next) {
     let collection = req["connessione"].db(DB_NAME).collection("posts");
     let param = req.body.param;
+    console.log("Entrato 1")
     param.dateTime = new Date();
+    console.log("Entrato 2")
     collection.insertOne(param, function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query");
@@ -17,28 +22,48 @@ export function createPost(req, res, cache, next) {
                 let part = [];
                 for (let item of data.participants) {
                     part = [...part, item.userid];
-                    req["connessione"].db(DB_NAME).collection('user').findOne({ _id: new ObjectId(item.travel) },async (err: any, data: any) => {
-                        for (let item of data.notifToken) {
-                            const expoPushToken = item;
-                            const message = {
-                                to: expoPushToken,
-                                sound: 'default',
-                                title: param.creator + ' ha pubblicato qualcosa! 🪁🪁',
-                                body: 'Vai subito a vedere!!',
-                                data: { additionalData: 'data opzionale' },
-                            };
-                            try {
-                                const response = await axios.post('https://exp.host/--/api/v2/push/send', message);
-                                console.log('Notifica inviata con successo:', response.data);
-                            } catch (error) {
-                                console.error('Errore nell\'invio della notifica:', error);
+                    req["connessione"].db(DB_NAME).collection('user').findOne({ _id: new ObjectId(item.userid) }, async (err: any, data2: any) => {
+                        let messages = [];
+                        for (let item of data2.notifToken) {
+                            if (!Expo.isExpoPushToken(item)) {
+                                console.error(`Push token ${item} is not a valid Expo push token`);
+                                continue;
                             }
+
+                            messages.push({
+                                to: item,
+                                sound: 'default',
+                                body: param.creator + ' ha pubblicato qualcosa! 🪁🪁',
+                                data: { withSome: 'data' },
+                            })
+
+                            let chunks = expo.chunkPushNotifications(messages);
+                            let tickets = [];
+                            (async () => {
+                                // Send the chunks to the Expo push notification service. There are
+                                // different strategies you could use. A simple one is to send one chunk at a
+                                // time, which nicely spreads the load out over time:
+                                for (let chunk of chunks) {
+                                    try {
+                                        let ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+                                        console.log(ticketChunk);
+                                        tickets.push(...ticketChunk);
+                                        // NOTE: If a ticket contains an error code in ticket.details.error, you
+                                        // must handle it appropriately. The error codes are listed in the Expo
+                                        // documentation:
+                                        // https://docs.expo.io/push-notifications/sending-notifications/#individual-errors
+                                    } catch (error) {
+                                        console.error(error);
+                                    }
+                                }
+                            })();
+
                         }
+                        res.status(200).send(data);
                     })
                 }
             })
 
-            // res.status(200).send(data);
         }
         cache.del("travel-post=" + param.travel);
     });

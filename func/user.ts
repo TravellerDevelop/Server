@@ -186,7 +186,6 @@ export function setUserNotifToken(req, res, cache, next) {
     req["connessione"].db(DB_NAME).collection("user").findOne({ _id: new ObjectId(req.body.userid) },
         async (err: any, data: any) => {
             if (!err) {
-                console.log(data)
                 let notifTokenArr: any = data.notifToken;
                 if (!notifTokenArr) {
                     notifTokenArr = [req.body.notifToken];
