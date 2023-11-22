@@ -15,7 +15,7 @@ export function takeUserInfo(req: any, res: any, cache: NodeCache, next) {
         let collection = req["connessione"].db(DB_NAME).collection("user");
         collection.find({ username: username }).toArray(function (err: any, data: any) {
             if (err) {
-                res.status(500).send({res : "Errore esecuzione query\n" + JSON.stringify(err)});
+                res.status(500).send({ res: "Errore esecuzione query\n" + JSON.stringify(err) });
             } else {
                 cache.set("user-usn=" + username, cachedData, 600);
                 res.send(data);
@@ -179,4 +179,39 @@ export function searchUser(req: any, res: any, cache: any, next) {
             next();
         });
     }
+}
+
+export function setUserNotifToken(req, res, cache, next) {
+    console.log("ARRIVATO")
+    req["connessione"].db(DB_NAME).collection("user").findOne({ _id: new ObjectId(req.body.userid) },
+        async (err: any, data: any) => {
+            if (!err) {
+                console.log(data)
+                let notifTokenArr: any = data.notifToken;
+                if (!notifTokenArr) {
+                    notifTokenArr = [req.body.notifToken];
+                }
+                else {
+                    notifTokenArr = [...notifTokenArr, req.body.notifToken];
+                }
+                
+                req["connessione"].db(DB_NAME).collection("user").updateOne(
+                    { _id: new ObjectId(req.body.userid) },
+                    { $set: { notifToken: notifTokenArr } },
+                    function (err: any, data: any) {
+                        if (err) {
+                            res.send({ upated: true, token: notifTokenArr }).status(200);
+                        } else {
+                            console.error(err);
+                            res.send(err).status(500);
+                        }
+                        next();
+                    });
+
+            } else {
+                res.send(err).status(500);
+                next();
+            }
+        }
+    )
 }
