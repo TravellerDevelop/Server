@@ -193,16 +193,16 @@ export function setUserNotifToken(req, res, cache, next) {
                 else {
                     notifTokenArr = [...notifTokenArr, req.body.notifToken];
                 }
-                
+
                 req["connessione"].db(DB_NAME).collection("user").updateOne(
                     { _id: new ObjectId(req.body.userid) },
                     { $set: { notifToken: notifTokenArr } },
                     function (err: any, data: any) {
                         if (err) {
-                            res.send({ upated: true, token: notifTokenArr }).status(200);
-                        } else {
-                            console.error(err);
                             res.send(err).status(500);
+                            console.error(err);
+                        } else {
+                            res.send({ updated: true, token: notifTokenArr }).status(200);
                         }
                         next();
                     });
@@ -213,4 +213,28 @@ export function setUserNotifToken(req, res, cache, next) {
             }
         }
     )
+}
+
+export function verifyToken(req, res, cache, next) {
+    req["connessione"].db(DB_NAME).collection("user").findOne({ _id: new ObjectId(req.body.userid) }, (response) => {
+        if (response.notifToken.includes(req.body.notificationToken)) {
+            console.log('Presente!');
+            res.send({ is: true }).status(200);
+            next();
+        }
+        else {
+            req["connessione"].db(DB_NAME).collection("user").updateOne(
+                { _id: new ObjectId(req.body.userid) },
+                { $set: { notifToken: req.body.notificationToken } },
+                function (err: any, data: any) {
+                    if (err) {
+                        console.error(err);
+                        res.send(err).status(500);
+                    } else {
+                        res.send({ is: false, updated: true }).status(200);
+                    }
+                    next();
+                });
+        }
+    })
 }
