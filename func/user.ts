@@ -216,25 +216,40 @@ export function setUserNotifToken(req, res, cache, next) {
 }
 
 export function verifyToken(req, res, cache, next) {
-    req["connessione"].db(DB_NAME).collection("user").findOne({ _id: new ObjectId(req.body.userid) }, (response) => {
-        if (response.notifToken.includes(req.body.notificationToken)) {
-            console.log('Presente!');
-            res.send({ is: true }).status(200);
-            next();
+    req["connessione"].db(DB_NAME).collection("user").findOne({ _id: new ObjectId(req.body.userid) }, (err, response) => {
+        if (!err) {
+            let include = false;
+            try{
+                include = response.notifToken.includes(req.body.notificationToken);
+            }catch(ex){
+                include = false;
+                response.notifToken = []
+            }
+            if (include) {
+                res.send({ is: true }).status(200);
+                next();
+            }
+            else {
+                let notifTokenArr: any = response.notifToken;
+                notifTokenArr = [...notifTokenArr, req.body.notificationToken];
+                req["connessione"].db(DB_NAME).collection("user").updateOne(
+                    { _id: new ObjectId(req.body.userid) },
+                    { $set: { notifToken: notifTokenArr } },
+                    function (err: any, data: any) {
+                        if (err) {
+                            console.error(err);
+                            res.send(err).status(500);
+                        } else {
+                            res.send({ is: false, updated: true }).status(200);
+                        }
+                        next();
+                    });
+            }
         }
         else {
-            req["connessione"].db(DB_NAME).collection("user").updateOne(
-                { _id: new ObjectId(req.body.userid) },
-                { $set: { notifToken: req.body.notificationToken } },
-                function (err: any, data: any) {
-                    if (err) {
-                        console.error(err);
-                        res.send(err).status(500);
-                    } else {
-                        res.send({ is: false, updated: true }).status(200);
-                    }
-                    next();
-                });
+            console.error(err);
+            res.send(err).status(500);
+            next();
         }
     })
 }

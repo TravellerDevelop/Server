@@ -9,7 +9,7 @@ import cors from "cors"; // @types/cors
 import { Server, Socket } from "socket.io";
 import calculateResponseTimeMiddleware from "./util/responseTime";
 import { takeVersion, verifyConnection } from "./util/tests";
-import { fromIdToUsername, login, registerUser, searchUser, setUserNotifToken, takeTravelsNum, takeUserById, takeUserInfo, userTravels } from "./func/user";
+import { fromIdToUsername, login, registerUser, searchUser, setUserNotifToken, takeTravelsNum, takeUserById, takeUserInfo, userTravels, verifyToken } from "./func/user";
 import { closeTravel, createTravel, deleteTravel, joinTravel, leaveTravel, takeJoinedTravels, takeTravelByCreator, takeTravelsParticipants, updateTravel, uploadImage } from "./func/travels";
 import fs from "fs";
 import { createPost, deletePost, takeLastsPostByUsername, takePosts, updatePayment, updatePinPost, updateVote } from "./func/post";
@@ -103,7 +103,7 @@ app.post("/api/user/login", function (req: any, res: any, next:any) { login(req,
 app.get("/api/user/travels", function (req: any, res: any, next:any) { userTravels(req, res, cache, next); });
 app.get("/api/user/search", function (req: any, res: any, next:any) { searchUser(req, res, cache, next); });
 app.post("/api/user/setNotifToken", function (req: any, res: any, next:any) { setUserNotifToken(req, res, cache, next); });
-app.post("/api/user/verifyToken", function (req: any, res: any, next:any) { setUserNotifToken(req, res, cache, next); });
+app.post("/api/user/verifyToken", function (req: any, res: any, next:any) { verifyToken(req, res, cache, next); });
 
 // GESTIONE TRAVELS
 app.post("/api/travel/create", function (req: any, res: any, next:any) { createTravel(req, res, cache, next); });
