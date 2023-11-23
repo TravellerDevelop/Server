@@ -103,6 +103,7 @@ app.post("/api/user/login", function (req: any, res: any, next:any) { login(req,
 app.get("/api/user/travels", function (req: any, res: any, next:any) { userTravels(req, res, cache, next); });
 app.get("/api/user/search", function (req: any, res: any, next:any) { searchUser(req, res, cache, next); });
 app.post("/api/user/setNotifToken", function (req: any, res: any, next:any) { setUserNotifToken(req, res, cache, next); });
+app.post("/api/user/verifyToken", function (req: any, res: any, next:any) { setUserNotifToken(req, res, cache, next); });
 
 // GESTIONE TRAVELS
 app.post("/api/travel/create", function (req: any, res: any, next:any) { createTravel(req, res, cache, next); });
