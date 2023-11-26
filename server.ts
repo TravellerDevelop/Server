@@ -94,7 +94,7 @@ app.get("/api/verifyConnection", (req: any, res: any, next:any) => { verifyConne
 app.get("/api/takeVersion", (req: any, res: any, next:any) => { takeVersion(req, res, cache, next); });
 
 /***********USER LISTENER****************/
-app.get("/api/user/info", (req: any, res: any, next:any) => { takeUserInfo(req, res, cache, next); });
+app.get("/api/user/info", (req: any, res: any, next:any) => { takeUserInfo(req, res, next); }); // UTILIZZARE SOLO PER LA REGISTRAZIONE
 app.get("/api/user/takeUserById", (req: any, res: any, next:any) => { takeUserById(req, res, cache, next); });
 app.post("/api/user/fromIdToUsernames", function (req: any, res: any, next:any) { fromIdToUsername(req, res, cache, next); });
 app.post("/api/user/register", function (req: any, res: any, next:any) { registerUser(req, res, next); });
