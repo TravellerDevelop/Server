@@ -2,27 +2,15 @@ import { ObjectId } from "mongodb";
 import NodeCache from "node-cache";
 import { DB_NAME } from "../server";
 
-export function takeUserInfo(req: any, res: any, cache: NodeCache, next) {
-    let username = req.query.username;
-    let cachedData = cache.get("user-usn=" + username);
-
-    if (cachedData) {
-        cache.set("user-usn=" + username, cachedData, 600);
-        res.send(cachedData).status(200);
+export function takeUserInfo(req: any, res: any, next) {
+    req["connessione"].db(DB_NAME).collection("user").find({ username: req.query.username }).toArray(function (err: any, data: any) {
+        if (err) {
+            res.status(500).send({ res: "Errore esecuzione query\n" + JSON.stringify(err) });
+        } else {
+            res.send(data);
+        }
         next();
-    }
-    else {
-        let collection = req["connessione"].db(DB_NAME).collection("user");
-        collection.find({ username: username }).toArray(function (err: any, data: any) {
-            if (err) {
-                res.status(500).send({ res: "Errore esecuzione query\n" + JSON.stringify(err) });
-            } else {
-                cache.set("user-usn=" + username, cachedData, 600);
-                res.send(data);
-            }
-            next();
-        });
-    }
+    });
 }
 
 export function takeUserById(req: any, res: any, cache: any, next) {
@@ -182,7 +170,6 @@ export function searchUser(req: any, res: any, cache: any, next) {
 }
 
 export function setUserNotifToken(req, res, cache, next) {
-    console.log("ARRIVATO")
     req["connessione"].db(DB_NAME).collection("user").findOne({ _id: new ObjectId(req.body.userid) },
         async (err: any, data: any) => {
             if (!err) {
@@ -219,9 +206,9 @@ export function verifyToken(req, res, cache, next) {
     req["connessione"].db(DB_NAME).collection("user").findOne({ _id: new ObjectId(req.body.userid) }, (err, response) => {
         if (!err) {
             let include = false;
-            try{
+            try {
                 include = response.notifToken.includes(req.body.notificationToken);
-            }catch(ex){
+            } catch (ex) {
                 include = false;
                 response.notifToken = []
             }
