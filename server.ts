@@ -123,8 +123,8 @@ app.get("/api/post/take", function (req: any, res: any, next:any) { takePosts(re
 app.post("/api/post/updateVote", function (req: any, res: any, next:any) { updateVote(req, res, next); });
 app.get("/api/post/takeLastsByUsername", function (req: any, res: any, next:any) { takeLastsPostByUsername(req, res, cache, next); });
 app.post("/api/post/updatePayment", function (req: any, res: any, next:any) { updatePayment(req, res, next); });
-app.post("/api/post/updatePinPost", function (req: any, res: any, next:any) { updatePinPost(req, res, next); });
-app.post("/api/post/deletePost", function (req: any, res: any, next:any) { deletePost(req, res, next); });
+app.post("/api/post/updatePinPost", function (req: any, res: any, next:any) { updatePinPost(req, res, cache, next); });
+app.post("/api/post/deletePost", function (req: any, res: any, next:any) { deletePost(req, res, cache, next); });
 
 app.get("/api/post/takeTotalExpenses", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("posts");

@@ -10,9 +10,7 @@ let expo = new Expo();
 export function createPost(req, res, cache, next) {
     let collection = req["connessione"].db(DB_NAME).collection("posts");
     let param = req.body.param;
-    console.log("Entrato 1")
     param.dateTime = new Date();
-    console.log("Entrato 2")
     collection.insertOne(param, function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query");
@@ -46,7 +44,6 @@ export function createPost(req, res, cache, next) {
                                 for (let chunk of chunks) {
                                     try {
                                         let ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-                                        console.log(ticketChunk);
                                         tickets.push(...ticketChunk);
                                         // NOTE: If a ticket contains an error code in ticket.details.error, you
                                         // must handle it appropriately. The error codes are listed in the Expo
@@ -126,7 +123,6 @@ export function takeLastsPostByUsername(req, res, cache, next) {
             req["connessione"].db(DB_NAME).collection("posts").find({ travel: { $in: ausData } }).sort({ dateTime: -1 }).limit(10).toArray(function (err: any, data: any) {
                 if (err) {
                     console.log("Errore esecuzione query 2");
-                    console.log(err)
                     res.status(500).send("Errore esecuzione query");
                 }
                 else {
@@ -156,23 +152,22 @@ export function updatePayment(req, res, next) {
     });
 }
 
-export function updatePinPost(req, res, next) {
+export function updatePinPost(req, res, cache, next) {
     let id = req.body.param._id;
     let pinned = req.body.param.pinned;
-
     let collection = req["connessione"].db(DB_NAME).collection("posts");
     collection.updateOne({ _id: new ObjectId(id) }, { $set: { "pinned": pinned } }, function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query");
         } else {
-            console.log("data: ", data);
             res.status(200).send(data);
+            cache.del("travel-post=" + req.body.param.travel);
         }
         next();
     });
 }
 
-export function deletePost(req, res, next) {
+export function deletePost(req, res, cache, next) {
     let id = req.body.id;
     req["connessione"].db(DB_NAME).collection("posts").findOne({ _id: new ObjectId(id) }, function (err: any, data: any) {
         if (err) {
@@ -198,6 +193,7 @@ export function deletePost(req, res, next) {
                     res.status(500).send("Errore esecuzione query");
                 } else {
                     res.status(200).send(data)
+                    cache.del("travel-post=" + req.body.travel);
                 }
                 next();
             });
