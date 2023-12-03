@@ -14,6 +14,7 @@ export function takeUserInfo(req: any, res: any, next) {
 }
 
 export function takeUserById(req: any, res: any, cache: any, next) {
+    console.log(req.query);
     let cachedData = cache.get("user-id=" + req.query.id);
 
     if (cachedData) {
@@ -205,6 +206,7 @@ export function setUserNotifToken(req, res, cache, next) {
 }
 
 export function verifyToken(req, res, cache, next) {
+    console.log(req.body)
     req["connessione"].db(DB_NAME).collection("user").findOne({ _id: new ObjectId(req.body.userid) }, (err, response) => {
         if (!err) {
             let include = false;

@@ -58,7 +58,7 @@ app.use("/", (req: any, res: any, next: any) => {
   if (ISDEBUG) {
     calculateResponseTimeMiddleware(req, res, next)
   }
-  else{
+  else {
     next();
   }
 });
@@ -90,41 +90,41 @@ app.use(fileupload({
 }));
 
 /* UTILITY */
-app.get("/api/verifyConnection", (req: any, res: any, next:any) => { verifyConnection(req, res, next);});
-app.get("/api/takeVersion", (req: any, res: any, next:any) => { takeVersion(req, res, cache, next); });
+app.get("/api/verifyConnection", (req: any, res: any, next: any) => { verifyConnection(req, res, next); });
+app.get("/api/takeVersion", (req: any, res: any, next: any) => { takeVersion(req, res, cache, next); });
 
 /***********USER LISTENER****************/
-app.get("/api/user/info", (req: any, res: any, next:any) => { takeUserInfo(req, res, next); }); // UTILIZZARE SOLO PER LA REGISTRAZIONE
-app.get("/api/user/takeUserById", (req: any, res: any, next:any) => { takeUserById(req, res, cache, next); });
-app.post("/api/user/fromIdToUsernames", function (req: any, res: any, next:any) { fromIdToUsername(req, res, cache, next); });
-app.post("/api/user/register", function (req: any, res: any, next:any) { registerUser(req, res, next); });
-app.get("/api/user/takeTravelsNum", function (req: any, res: any, next:any) { takeTravelsNum(req, res, cache, next); });
-app.post("/api/user/login", function (req: any, res: any, next:any) { login(req, res, cache, next); });
-app.get("/api/user/travels", function (req: any, res: any, next:any) { userTravels(req, res, cache, next); });
-app.get("/api/user/search", function (req: any, res: any, next:any) { searchUser(req, res, cache, next); });
-app.post("/api/user/setNotifToken", function (req: any, res: any, next:any) { setUserNotifToken(req, res, cache, next); });
-app.post("/api/user/verifyToken", function (req: any, res: any, next:any) { verifyToken(req, res, cache, next); });
+app.get("/api/user/info", (req: any, res: any, next: any) => { takeUserInfo(req, res, next); }); // UTILIZZARE SOLO PER LA REGISTRAZIONE
+app.get("/api/user/takeUserById", (req: any, res: any, next: any) => { takeUserById(req, res, cache, next); });
+app.post("/api/user/fromIdToUsernames", function (req: any, res: any, next: any) { fromIdToUsername(req, res, cache, next); });
+app.post("/api/user/register", function (req: any, res: any, next: any) { registerUser(req, res, next); });
+app.get("/api/user/takeTravelsNum", function (req: any, res: any, next: any) { takeTravelsNum(req, res, cache, next); });
+app.post("/api/user/login", function (req: any, res: any, next: any) { login(req, res, cache, next); });
+app.get("/api/user/travels", function (req: any, res: any, next: any) { userTravels(req, res, cache, next); });
+app.get("/api/user/search", function (req: any, res: any, next: any) { searchUser(req, res, cache, next); });
+app.post("/api/user/setNotifToken", function (req: any, res: any, next: any) { setUserNotifToken(req, res, cache, next); });
+app.post("/api/user/verifyToken", function (req: any, res: any, next: any) { verifyToken(req, res, cache, next); });
 
 // GESTIONE TRAVELS
-app.post("/api/travel/create", function (req: any, res: any, next:any) { createTravel(req, res, cache, next); });
-app.post("/api/travel/join", function (req: any, res: any, next:any) { joinTravel(req, res, cache, next); });
-app.get("/api/travel/takeJoined", function (req: any, res: any, next:any) { takeJoinedTravels(req, res, cache, next); });
-app.get("/api/travel/takeParticipants", (req: any, res: any, next:any) => { takeTravelsParticipants(req, res, cache, next);; });
-app.get("/api/travel/takeByCreator", function (req: any, res: any, next:any) { takeTravelByCreator(req, res, cache, next); });
-app.post("/api/travel/update", function (req: any, res: any, next:any) { updateTravel(req, res, next); });
-app.post("/api/travel/close", function (req: any, res: any, next:any) { closeTravel(req, res, next); });
-app.post("/api/travel/delete", function (req: any, res: any, next:any) { deleteTravel(req, res, next);});
-app.post("/api/travel/leave", function (req: any, res: any, next:any) { leaveTravel(req, res, cache, next); });
-app.post('/api/travel/uploadImage', function (req, res, next:any) { uploadImage(req, res, next); })
+app.post("/api/travel/create", function (req: any, res: any, next: any) { createTravel(req, res, cache, next); });
+app.post("/api/travel/join", function (req: any, res: any, next: any) { joinTravel(req, res, cache, next); });
+app.get("/api/travel/takeJoined", function (req: any, res: any, next: any) { takeJoinedTravels(req, res, cache, next); });
+app.get("/api/travel/takeParticipants", (req: any, res: any, next: any) => { takeTravelsParticipants(req, res, cache, next);; });
+app.get("/api/travel/takeByCreator", function (req: any, res: any, next: any) { takeTravelByCreator(req, res, cache, next); });
+app.post("/api/travel/update", function (req: any, res: any, next: any) { updateTravel(req, res, next); });
+app.post("/api/travel/close", function (req: any, res: any, next: any) { closeTravel(req, res, next); });
+app.post("/api/travel/delete", function (req: any, res: any, next: any) { deleteTravel(req, res, next); });
+app.post("/api/travel/leave", function (req: any, res: any, next: any) { leaveTravel(req, res, cache, next); });
+app.post('/api/travel/uploadImage', function (req, res, next: any) { uploadImage(req, res, next); })
 
 // GESTIONE DEI POST
-app.post("/api/post/create", function (req: any, res: any, next:any) { createPost(req, res, cache, next); });
-app.get("/api/post/take", function (req: any, res: any, next:any) { takePosts(req, res, cache, next); });
-app.post("/api/post/updateVote", function (req: any, res: any, next:any) { updateVote(req, res, next); });
-app.get("/api/post/takeLastsByUsername", function (req: any, res: any, next:any) { takeLastsPostByUsername(req, res, cache, next); });
-app.post("/api/post/updatePayment", function (req: any, res: any, next:any) { updatePayment(req, res, next); });
-app.post("/api/post/updatePinPost", function (req: any, res: any, next:any) { updatePinPost(req, res, cache, next); });
-app.post("/api/post/deletePost", function (req: any, res: any, next:any) { deletePost(req, res, cache, next); });
+app.post("/api/post/create", function (req: any, res: any, next: any) { createPost(req, res, cache, next); });
+app.get("/api/post/take", function (req: any, res: any, next: any) { takePosts(req, res, cache, next); });
+app.post("/api/post/updateVote", function (req: any, res: any, next: any) { updateVote(req, res, next); });
+app.get("/api/post/takeLastsByUsername", function (req: any, res: any, next: any) { takeLastsPostByUsername(req, res, cache, next); });
+app.post("/api/post/updatePayment", function (req: any, res: any, next: any) { updatePayment(req, res, next); });
+app.post("/api/post/updatePinPost", function (req: any, res: any, next: any) { updatePinPost(req, res, cache, next); });
+app.post("/api/post/deletePost", function (req: any, res: any, next: any) { deletePost(req, res, cache, next); });
 
 app.get("/api/post/takeTotalExpenses", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("posts");
@@ -245,9 +245,7 @@ app.get("/api/post/takePayedGroupByTravel", function (req: any, res: any, next) 
       req["connessione"].close();
     }
     else {
-      let collection2 = req["connessione"].db(DB_NAME).collection("travels");
-
-      collection2.find({ _id: { $in: data.map((item: any) => new ObjectId(item._id)) } }).toArray(function (err: any, data2: any) {
+      req["connessione"].db(DB_NAME).collection("travels").find({ _id: { $in: data.map((item: any) => new ObjectId(item._id)) } }).toArray(function (err: any, data2: any) {
         if (err) {
           console.log("Errore esecuzione query");
           res.status(500).send("Errore esecuzione query");
@@ -398,6 +396,44 @@ app.get("/api/follow/takeFollowers", function (req: any, res: any) { takeFollowe
 app.get("/api/follow/takeFollowings", function (req: any, res: any) { takeFollowings(req, res, cache) });
 app.get("/api/follow/takeFollowingsWithInfo", function (req: any, res: any) { takeFollowingsWithInfo(req, res, cache) });
 
+app.get("/api/utility", (req, res, next) => {
+  req["connessione"].db(DB_NAME).collection("travels").find()
+    .toArray((err, response) => {
+      if (!err) {
+        for (let item of response) {
+          req["connessione"].db(DB_NAME).collection("posts").updateMany({ travel: item._id.toString() }, { $set: { travel: item._id } })
+            .then(() => {
+              console.log("Successo per " + item.name);
+            })
+            .catch(() => {
+              console.log("Fallimento per " + item.name);
+            })
+        }
+      }
+      else {
+        console.log('Errore 1');
+      }
+    })
+
+  req["connessione"].db(DB_NAME).collection("user").find()
+    .toArray((err, response) => {
+      if (!err) {
+        for (let item of response) {
+          req["connessione"].db(DB_NAME).collection("posts").updateMany({ creator: item.username }, { $set: { creator: item._id } })
+            .then(() => {
+              console.log("Successo per " + item.username);
+            })
+            .catch(() => {
+              console.log("Fallimento per " + item.username);
+            })
+        }
+      }
+      else {
+        console.log('Errore 1');
+      }
+    })
+})
+
 // Gestione ticket
 app.post("/api/tickets/create", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("tickets");
@@ -408,7 +444,7 @@ app.post("/api/tickets/create", function (req: any, res: any, next) {
       res.status(500).send("Errore esecuzione query");
     } else {
       res.status(200).send(data);
-      cache.del("tickets="+param.createor)
+      cache.del("tickets=" + param.createor)
     }
 
     req["connessione"].close();
@@ -422,7 +458,7 @@ app.get("/api/tickets/take", function (req: any, res: any, next) {
     res.send(cachedData).status(200);
     cache.set("tickets=" + userid, cachedData, 600);
   }
-  else{
+  else {
     req["connessione"].db(DB_NAME).collection("tickets").find({ creator: userid }).sort({ date: -1 }).toArray(function (err: any, data: any) {
       if (err) {
         res.status(500).send("Errore esecuzione query");
@@ -431,7 +467,7 @@ app.get("/api/tickets/take", function (req: any, res: any, next) {
         res.status(200).send(data);
         cache.set("tickets=" + userid, data, 600);
       }
-  
+
       req["connessione"].close();
     });
   }
