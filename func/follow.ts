@@ -1,7 +1,5 @@
 import { ObjectId } from "mongodb";
-import NodeCache from "node-cache";
 import { DB_NAME } from "../server";
-import fs from "fs";
 
 export function takeFollowers(req, res, cache) {
     let to = req.query.to;
