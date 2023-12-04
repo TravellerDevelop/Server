@@ -5,15 +5,13 @@ import { DB_NAME } from "../server";
 
 let expo = new Expo();
 
-
-
 export function createPost(req, res, cache, next) {
     let collection = req["connessione"].db(DB_NAME).collection("posts");
     let param = req.body.param;
-    try{
+    try {
         param.travel = new ObjectId(param.travel);
         param.creator = new ObjectId(param.creator);
-    }catch(ex){
+    } catch (ex) {
         console.error('Incorrect data format')
     }
     param.dateTime = new Date();
@@ -68,6 +66,7 @@ export function createPost(req, res, cache, next) {
             })
 
         }
+        cache.set("latest-post=" + param.creator.toString());
         cache.del("travel-post=" + param.travel);
     });
 }
@@ -96,12 +95,14 @@ export async function takePosts(req, res, cache, next) {
                     dateTime: -1
                 }
             },
-            // {
-            //     $project:
-            //     {
-            //         _id:1
-            //     }
-            // },
+            {
+                $project:
+                {
+                    "creatorData.email": false,
+                    "creatorData.notifToken": false,
+                    "creatorData.password": false,
+                }
+            },
             {
                 $match:
                 {
@@ -112,6 +113,7 @@ export async function takePosts(req, res, cache, next) {
             .toArray((err, response) => {
                 if (err) throw err;
                 res.send(response).status(200);
+                cache.set("travel-post=" + travel, response)
                 next();
             })
     }
@@ -134,71 +136,73 @@ export function updateVote(req, res, next) {
 export function takeLastsPostByUsername(req, res, cache, next) {
     let username = req.query.username;
     let userid = req.query.userid;
-    req["connessione"].db(DB_NAME).collection("travels").find({ "participants.userid": userid, "participants.username": username }).toArray(function (err: any, data: any) {
-        if (err) {
-            console.log("Errore esecuzione query");
-            res.status(500).send("Errore esecuzione query");
-            next();
-        }
-        else {
-            let ausData = [];
-            let ausName = [];
-            for (let item of data) {
-                console.log(item._id)
-                ausData.push(item._id);
-                ausName.push(item.name);
+    let cachedData = cache.get("latest-post=" + userid);
+    if(cachedData){
+        res.send(cachedData).status(200);
+        cache.set("latest-post=" + userid, cachedData);
+        next();
+    }
+    else{
+        req["connessione"].db(DB_NAME).collection("travels").find({ "participants.userid": userid, "participants.username": username }).toArray(function (err: any, data: any) {
+            if (err) {
+                console.log("Errore esecuzione query");
+                res.status(500).send("Errore esecuzione query");
+                next();
             }
-
-            req["connessione"].db(DB_NAME).collection("posts").aggregate([
-                {
-                    $lookup:
-                    {
-                        from: 'user',
-                        localField: 'creator',
-                        foreignField: '_id',
-                        as: 'creatorData',
-                    },
-                },
-                {
-                    $match:
-                    {
-                        travel: { $in: ausData }
-                    }
-                },
-                {
-                    $sort: {
-                        dateTime: -1
-                    }
-                },
-                {
-                    $limit: 10
+            else {
+                let ausData = [];
+                let ausName = [];
+                for (let item of data) {
+                    ausData.push(item._id);
+                    ausName.push(item.name);
                 }
-            ])
-                .toArray((err, response) => {
-                    if (err) throw err;
-                    let otherData = {}
-                    for (let item in ausData) {
-                        otherData[ausData[item]] = ausName[item];
+    
+                req["connessione"].db(DB_NAME).collection("posts").aggregate([
+                    {
+                        $lookup:
+                        {
+                            from: 'user',
+                            localField: 'creator',
+                            foreignField: '_id',
+                            as: 'creatorData',
+                        },
+                    },
+                    {
+                        $match:
+                        {
+                            travel: { $in: ausData }
+                        }
+                    },
+                    {
+                        $sort: {
+                            dateTime: -1
+                        }
+                    },
+                    {
+                        $limit: 10
+                    },
+                    {
+                        $project:
+                        {
+                            "creatorData.email": false,
+                            "creatorData.notifToken": false,
+                            "creatorData.password": false,
+                        }
                     }
-                    res.status(200).send([response, otherData]);
-                })
-            // req["connessione"].db(DB_NAME).collection("posts").find({ travel: { $in: ausData } }).sort({ dateTime: -1 }).limit(10).toArray(function (err: any, data: any) {
-            //     if (err) {
-            //         console.log("Errore esecuzione query 2");
-            //         res.status(500).send("Errore esecuzione query");
-            //     }
-            //     else {
-            //         let otherData = {}
-            //         for (let item in ausData) {
-            //             otherData[ausData[item]] = ausName[item];
-            //         }
-
-            //         res.status(200).send([data, otherData]);
-            //     }
-            //     next();
-            // });
-        }
-    });
+                ])
+                    .toArray((err, response) => {
+                        if (err) throw err;
+                        let otherData = {}
+                        for (let item in ausData) {
+                            otherData[ausData[item]] = ausName[item];
+                        }
+                        res.status(200).send([response, otherData]);
+                        cache.set("latest-post=" + userid, [response, otherData]);
+                        next();
+                    })
+            }
+        });
+    }
 }
 
 export function updatePayment(req, res, next) {
@@ -236,7 +240,7 @@ export function deletePost(req, res, cache, next) {
             res.status(500).send("Errore esecuzione query");
             next();
         } else {
-            if(data){
+            if (data) {
                 if (typeof data.type != "undefined") {
                     if (data.type == "images") {
                         let path = data.source;
