@@ -18,11 +18,12 @@ const NodeCache = require("node-cache");
 
 dotenv.config({ path: ".env" });
 
-const cache = new NodeCache({ stdTTL: 0, checkperiod: 120 });
 const app = express();
 const httpServer = http.createServer(app);
 const io = new Server(httpServer);
 const PORT = process.env.PORT || 1337;
+
+const cache = new NodeCache({ stdTTL: 0, checkperiod: 120 });
 export const DB_NAME = "traveller";
 const connectionString: any = process.env.connectionString;
 const fileupload = require('express-fileupload');
@@ -30,10 +31,9 @@ const socket: any = [];
 export const ISDEBUG = true;
 
 //CREAZIONE E AVVIO DEL SERVER HTTP
-let server = http.createServer(app);
 let paginaErrore: string = "";
 
-server.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   init();
   console.log("Server in ascolto sulla porta " + PORT);
 });
@@ -120,12 +120,11 @@ app.post('/api/travel/uploadImage', function (req, res, next: any) { uploadImage
 // GESTIONE DEI POST
 app.post("/api/post/create", function (req: any, res: any, next: any) { createPost(req, res, cache, next); });
 app.get("/api/post/take", function (req: any, res: any, next: any) { takePosts(req, res, cache, next); });
-app.post("/api/post/updateVote", function (req: any, res: any, next: any) { updateVote(req, res, next); });
+app.post("/api/post/updateVote", function (req: any, res: any, next: any) { updateVote(req, res, cache, next); });
 app.get("/api/post/takeLastsByUsername", function (req: any, res: any, next: any) { takeLastsPostByUsername(req, res, cache, next); });
-app.post("/api/post/updatePayment", function (req: any, res: any, next: any) { updatePayment(req, res, next); });
+app.post("/api/post/updatePayment", function (req: any, res: any, next: any) { updatePayment(req, res, cache, next); });
 app.post("/api/post/updatePinPost", function (req: any, res: any, next: any) { updatePinPost(req, res, cache, next); });
 app.post("/api/post/deletePost", function (req: any, res: any, next: any) { deletePost(req, res, cache, next); });
-
 app.get("/api/post/takeTotalExpenses", function (req: any, res: any, next) {
   let collection = req["connessione"].db(DB_NAME).collection("posts");
   let userid = req.query.userid;
@@ -224,11 +223,9 @@ app.get("/api/post/takeTotalPayedByTravel", function (req: any, res: any, next) 
 });
 
 app.get("/api/post/takePayedGroupByTravel", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("posts");
-
   let userid = req.query.userid;
 
-  collection.aggregate([
+  req["connessione"].db(DB_NAME).collection("posts").aggregate([
     { $match: { "destinator.userid": userid, type: "payments" } },
     { $unwind: "$destinator" },
     { $match: { "destinator.userid": userid, type: "payments" } },
@@ -245,7 +242,10 @@ app.get("/api/post/takePayedGroupByTravel", function (req: any, res: any, next) 
       req["connessione"].close();
     }
     else {
-      req["connessione"].db(DB_NAME).collection("travels").find({ _id: { $in: data.map((item: any) => new ObjectId(item._id)) } }).toArray(function (err: any, data2: any) {
+      req["connessione"].db(DB_NAME).collection("travels").find({ _id: { $in: data.map((item: any) => item._id) } }).project({
+        _id: true,
+        name: true
+      }).toArray(function (err: any, data2: any) {
         if (err) {
           console.log("Errore esecuzione query");
           res.status(500).send("Errore esecuzione query");
@@ -254,7 +254,9 @@ app.get("/api/post/takePayedGroupByTravel", function (req: any, res: any, next) 
         else {
           let ausData = [];
           for (let item of data2) {
-            ausData.push({ name: item.name, total: data.filter((item2: any) => item2._id == item._id)[0].total });
+            console.log(data.filter((item2: any) => item2._id.toString() == item._id.toString()))
+            let aus = data.filter((item2: any) => item2._id.toString() == item._id.toString())
+            ausData.push({ name: item.name, total: (JSON.stringify(aus) != '[]') ? aus[0].total : 0 });
           }
 
           res.status(200).send(ausData);
@@ -508,9 +510,22 @@ app.post("/api/tickets/share", function (req: any, res: any, next) {
   });
 })
 
-// Gestione socket
+/* GESTIONE SOCKET */
+let users = [];
 io.on('connection', (socket: Socket) => {
   console.log('A user connected');
+  let user:any = {};
+
+  socket.on("joinTravel", async (clientUser) => {
+    console.log(clientUser)
+    user = clientUser;
+    users.push(user);
+    socket.join('travel='+user.travelId);
+  })
+
+  socket.on("newpost", (data) => {
+    io.to('travel='+user.travelId).emit("NewPostFromServer", data)
+  })
 
   // Esempio di gestione di un evento personalizzato
   socket.on('custom-event', (data) => {

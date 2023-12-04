@@ -5,6 +5,16 @@ import { DB_NAME } from "../server";
 
 let expo = new Expo();
 
+/* 
+
+-----------
+Cached data
+-----------
+"latest-post=" + user_id -> Ultimi post per ogni utente (Da rimuovere, rischio di incongruenze) 
+"travel-post=" + travel_id -> Post relativi ad un viaggio 
+
+*/
+
 export function createPost(req, res, cache, next) {
     let collection = req["connessione"].db(DB_NAME).collection("posts");
     let param = req.body.param;
@@ -66,7 +76,6 @@ export function createPost(req, res, cache, next) {
             })
 
         }
-        cache.set("latest-post=" + param.creator.toString());
         cache.del("travel-post=" + param.travel);
     });
 }
@@ -119,7 +128,7 @@ export async function takePosts(req, res, cache, next) {
     }
 }
 
-export function updateVote(req, res, next) {
+export function updateVote(req, res, cache, next) {
     let id = req.body.id;
     let vote = req.body.vote;
 
@@ -128,6 +137,7 @@ export function updateVote(req, res, next) {
             res.status(500).send("Errore esecuzione query");
         } else {
             res.status(200).send(data);
+            cache.del("travel-post=" + req.body.travelid);
         }
         next();
     });
@@ -136,76 +146,67 @@ export function updateVote(req, res, next) {
 export function takeLastsPostByUsername(req, res, cache, next) {
     let username = req.query.username;
     let userid = req.query.userid;
-    let cachedData = cache.get("latest-post=" + userid);
-    if(cachedData){
-        res.send(cachedData).status(200);
-        cache.set("latest-post=" + userid, cachedData);
-        next();
-    }
-    else{
-        req["connessione"].db(DB_NAME).collection("travels").find({ "participants.userid": userid, "participants.username": username }).toArray(function (err: any, data: any) {
-            if (err) {
-                console.log("Errore esecuzione query");
-                res.status(500).send("Errore esecuzione query");
-                next();
+    req["connessione"].db(DB_NAME).collection("travels").find({ "participants.userid": userid, "participants.username": username }).toArray(function (err: any, data: any) {
+        if (err) {
+            console.log("Errore esecuzione query");
+            res.status(500).send("Errore esecuzione query");
+            next();
+        }
+        else {
+            let ausData = [];
+            let ausName = [];
+            for (let item of data) {
+                ausData.push(item._id);
+                ausName.push(item.name);
             }
-            else {
-                let ausData = [];
-                let ausName = [];
-                for (let item of data) {
-                    ausData.push(item._id);
-                    ausName.push(item.name);
-                }
-    
-                req["connessione"].db(DB_NAME).collection("posts").aggregate([
+
+            req["connessione"].db(DB_NAME).collection("posts").aggregate([
+                {
+                    $lookup:
                     {
-                        $lookup:
-                        {
-                            from: 'user',
-                            localField: 'creator',
-                            foreignField: '_id',
-                            as: 'creatorData',
-                        },
+                        from: 'user',
+                        localField: 'creator',
+                        foreignField: '_id',
+                        as: 'creatorData',
                     },
+                },
+                {
+                    $match:
                     {
-                        $match:
-                        {
-                            travel: { $in: ausData }
-                        }
-                    },
-                    {
-                        $sort: {
-                            dateTime: -1
-                        }
-                    },
-                    {
-                        $limit: 10
-                    },
-                    {
-                        $project:
-                        {
-                            "creatorData.email": false,
-                            "creatorData.notifToken": false,
-                            "creatorData.password": false,
-                        }
+                        travel: { $in: ausData }
                     }
-                ])
-                    .toArray((err, response) => {
-                        if (err) throw err;
-                        let otherData = {}
-                        for (let item in ausData) {
-                            otherData[ausData[item]] = ausName[item];
-                        }
-                        res.status(200).send([response, otherData]);
-                        cache.set("latest-post=" + userid, [response, otherData]);
-                        next();
-                    })
-            }
-        });
-    }
+                },
+                {
+                    $sort: {
+                        dateTime: -1
+                    }
+                },
+                {
+                    $limit: 10
+                },
+                {
+                    $project:
+                    {
+                        "creatorData.email": false,
+                        "creatorData.notifToken": false,
+                        "creatorData.password": false,
+                    }
+                }
+            ])
+                .toArray((err, response) => {
+                    if (err) throw err;
+                    let otherData = {}
+                    for (let item in ausData) {
+                        otherData[ausData[item]] = ausName[item];
+                    }
+                    res.status(200).send([response, otherData]);
+                    next();
+                })
+        }
+    });
 }
 
-export function updatePayment(req, res, next) {
+export function updatePayment(req, res, cache, next) {
     let id = req.body.id;
     let destinator = req.body.destinator;
     req["connessione"].db(DB_NAME).collection("posts").updateOne({ _id: new ObjectId(id) }, { $set: { destinator: destinator } }, function (err: any, data: any) {
@@ -213,6 +214,7 @@ export function updatePayment(req, res, next) {
             res.status(500).send("Errore esecuzione query");
         } else {
             res.status(200).send(data);
+            cache.del("travel-post=" + req.body.travelid);
         }
         next();
     });
