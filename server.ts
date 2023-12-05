@@ -517,11 +517,20 @@ io.on('connection', (socket: Socket) => {
   let user:any = {};
 
   socket.on("joinTravel", async (clientUser) => {
-    console.log(clientUser)
     user = clientUser;
     users.push(user);
     socket.join('travel='+user.travelId);
+    if(ISDEBUG){
+      console.log('Joined in: travel='+user.travelId)
+    }
   })
+
+  socket.on('leaveTravel', (user) => {
+    socket.leave(user.travel);
+    if(ISDEBUG){
+      console.log('Left from: '+user.travel)
+    }
+  });
 
   socket.on("newpost", (data) => {
     io.to('travel='+user.travelId).emit("NewPostFromServer", data)
