@@ -1,5 +1,5 @@
 import { ObjectId } from "mongodb";
-import { DB_NAME } from "../server";
+import { DB_NAME, mongoConnection } from "../server";
 
 export function takeFollowers(req, res, cache) {
     let to = req.query.to;
@@ -9,7 +9,7 @@ export function takeFollowers(req, res, cache) {
         cache.set("followers=" + to, cachedData, 600);
     }
     else {
-        req["connessione"].db(DB_NAME).collection("follow").find({ to: to, accepted: true }).toArray(function (err: any, data: any) {
+        mongoConnection.db(DB_NAME).collection("follow").find({ to: to, accepted: true }).toArray(function (err: any, data: any) {
             if (err) {
                 res.status(500).send("Errore esecuzione query");
             }
@@ -28,7 +28,7 @@ export function takeFollowings(req, res, cache) {
         res.send(cachedData).status(200);
         cache.set("followings=" + from, cachedData, 600);
     } else {
-        req["connessione"].db(DB_NAME).collection("follow").find({ from: from, accepted: true }).toArray(function (err: any, data: any) {
+        mongoConnection.db(DB_NAME).collection("follow").find({ from: from, accepted: true }).toArray(function (err: any, data: any) {
             if (err) {
                 res.status(500).send("Errore esecuzione query");
             }
@@ -48,7 +48,7 @@ export function takeFollowingsWithInfo(req, res, cache) {
         cache.set("followingsWithInfo=" + from, cachedData, 600);
     }
     else {
-        req["connessione"].db(DB_NAME).collection("follow").find({ from: from, accepted: true }).toArray(function (err: any, data: any) {
+        mongoConnection.db(DB_NAME).collection("follow").find({ from: from, accepted: true }).toArray(function (err: any, data: any) {
             if (err) {
                 res.status(500).send("Errore esecuzione query 1");
             }
@@ -57,7 +57,7 @@ export function takeFollowingsWithInfo(req, res, cache) {
                 for (let item of data) {
                     aus.push(new ObjectId(item.to));
                 }
-                req["connessione"].db(DB_NAME).collection("user").find({ _id: { $in: aus } }).toArray((err: any, data: any) => {
+                mongoConnection.db(DB_NAME).collection("user").find({ _id: { $in: aus } }).toArray((err: any, data: any) => {
                     if (err) {
                         res.status(500).send("Errore esecuzione query 2");
                     }

@@ -1,9 +1,9 @@
 import { ObjectId } from "mongodb";
 import NodeCache from "node-cache";
-import { DB_NAME } from "../server";
+import { DB_NAME, mongoConnection } from "../server";
 
 export function takeUserInfo(req: any, res: any, next) {
-    req["connessione"].db(DB_NAME).collection("user").find({ username: req.query.username }).toArray(function (err: any, data: any) {
+    mongoConnection.db(DB_NAME).collection("user").find({ username: req.query.username }).toArray(function (err: any, data: any) {
         if (err) {
             res.status(500).send({ res: "Errore esecuzione query\n" + JSON.stringify(err) });
         } else {
@@ -22,7 +22,7 @@ export function takeUserById(req: any, res: any, cache: any, next) {
         next();
     }
     else {
-        let collection = req["connessione"].db(DB_NAME).collection("user");
+        let collection = mongoConnection.db(DB_NAME).collection("user");
         let id = req.query.id;
         console.log(id)
         if (id) {
@@ -45,7 +45,7 @@ export function fromIdToUsername(req: any, res: any, cache: any, next) {
         ausId.push(new ObjectId(item));
     }
 
-    req["connessione"].db(DB_NAME).collection("user").find({ _id: { $in: ausId } }).toArray(function (err: any, data: any) {
+    mongoConnection.db(DB_NAME).collection("user").find({ _id: { $in: ausId } }).toArray(function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query");
         } else {
@@ -56,7 +56,7 @@ export function fromIdToUsername(req: any, res: any, cache: any, next) {
 }
 
 export function registerUser(req: any, res: any, next) {
-    req["connessione"].db(DB_NAME).collection("user").find({ username: req.body.username }).toArray(function (err: any, data: any) {
+    mongoConnection.db(DB_NAME).collection("user").find({ username: req.body.username }).toArray(function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query");
             console.log("Errore esecuzione query 1");
@@ -65,7 +65,7 @@ export function registerUser(req: any, res: any, next) {
             if (data.length != 0) {
                 res.status(202).send("Username già in uso");
             } else {
-                req["connessione"].db(DB_NAME).collection("user").insertOne(req.body, function (err: any, data: any) {
+                mongoConnection.db(DB_NAME).collection("user").insertOne(req.body, function (err: any, data: any) {
                     if (err) {
                         res.status(500).send("Errore esecuzione query");
                         console.log("Errore esecuzione query 2\n", err);
@@ -89,7 +89,7 @@ export function takeTravelsNum(req: any, res: any, cache: NodeCache, next) {
         next();
     }
     else {
-        req["connessione"].db(DB_NAME).collection("travels").countDocuments({ "participants": { "$elemMatch": { "userid": userid, "creator": true } } }, { "participants.$": 1 }).then(function (data: any) {
+        mongoConnection.db(DB_NAME).collection("travels").countDocuments({ "participants": { "$elemMatch": { "userid": userid, "creator": true } } }, { "participants.$": 1 }).then(function (data: any) {
             cache.set("travelsNum-id=" + userid, { count: data }, 600);
             res.send({ count: data }).status(200);
             next();
@@ -102,7 +102,7 @@ export function takeTravelsNum(req: any, res: any, cache: NodeCache, next) {
 }
 
 export function login(req: any, res: any, cache: NodeCache, next) {
-    let collection = req["connessione"].db(DB_NAME).collection("user");
+    let collection = mongoConnection.db(DB_NAME).collection("user");
     collection.find({ username: req.body.username }).toArray(function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query");
@@ -130,7 +130,7 @@ export function userTravels(req: any, res: any, cache: NodeCache, next) {
         res.send(cachedData).status(200);
         next();
     }
-    let collection = req["connessione"].db(DB_NAME).collection("travels");
+    let collection = mongoConnection.db(DB_NAME).collection("travels");
     collection.find({ creator: username }).toArray(function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query");
@@ -152,7 +152,7 @@ export function searchUser(req: any, res: any, cache: any, next) {
         next();
     }
     else {
-        let collection = req["connessione"].db(DB_NAME).collection("user");
+        let collection = mongoConnection.db(DB_NAME).collection("user");
         const regex = new RegExp(username, 'i');
         collection.find({ $or: [{ username: { $regex: regex } }, { name: { $regex: regex } }, { surname: { $regex: regex } }] }).limit(3).toArray(function (err: any, data: any) {
             if (err) {
@@ -168,7 +168,7 @@ export function searchUser(req: any, res: any, cache: any, next) {
 }
 
 export function setUserNotifToken(req, res, cache, next) {
-    req["connessione"].db(DB_NAME).collection("user").findOne({ _id: new ObjectId(req.body.userid) },
+    mongoConnection.db(DB_NAME).collection("user").findOne({ _id: new ObjectId(req.body.userid) },
         async (err: any, data: any) => {
             if (!err) {
                 let notifTokenArr: any = data.notifToken;
@@ -179,7 +179,7 @@ export function setUserNotifToken(req, res, cache, next) {
                     notifTokenArr = [...notifTokenArr, req.body.notifToken];
                 }
 
-                req["connessione"].db(DB_NAME).collection("user").updateOne(
+                mongoConnection.db(DB_NAME).collection("user").updateOne(
                     { _id: new ObjectId(req.body.userid) },
                     { $set: { notifToken: notifTokenArr } },
                     function (err: any, data: any) {
@@ -202,7 +202,7 @@ export function setUserNotifToken(req, res, cache, next) {
 
 export function verifyToken(req, res, cache, next) {
     console.log(req.body)
-    req["connessione"].db(DB_NAME).collection("user").findOne({ _id: new ObjectId(req.body.userid) }, (err, response) => {
+    mongoConnection.db(DB_NAME).collection("user").findOne({ _id: new ObjectId(req.body.userid) }, (err, response) => {
         if (!err) {
             let include = false;
             try {
@@ -218,7 +218,7 @@ export function verifyToken(req, res, cache, next) {
             else {
                 let notifTokenArr: any = response.notifToken;
                 notifTokenArr = [...notifTokenArr, req.body.notificationToken];
-                req["connessione"].db(DB_NAME).collection("user").updateOne(
+                mongoConnection.db(DB_NAME).collection("user").updateOne(
                     { _id: new ObjectId(req.body.userid) },
                     { $set: { notifToken: notifTokenArr } },
                     function (err: any, data: any) {
