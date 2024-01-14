@@ -1,7 +1,7 @@
 import { Expo } from 'expo-server-sdk';
 import fs from "fs";
 import { ObjectId } from "mongodb";
-import { DB_NAME } from "../server";
+import { DB_NAME, mongoConnection } from "../server";
 
 let expo = new Expo();
 
@@ -16,7 +16,7 @@ Cached data
 */
 
 export function createPost(req, res, cache, next) {
-    let collection = req["connessione"].db(DB_NAME).collection("posts");
+    let collection = mongoConnection.db(DB_NAME).collection("posts");
     let param = req.body.param;
     try {
         param.travel = new ObjectId(param.travel);
@@ -30,11 +30,11 @@ export function createPost(req, res, cache, next) {
             res.status(500).send("Errore esecuzione query");
             next();
         } else {
-            req["connessione"].db(DB_NAME).collection('travels').findOne({ _id: new ObjectId(param.travel) }, (err: any, data: any) => {
+            mongoConnection.db(DB_NAME).collection('travels').findOne({ _id: new ObjectId(param.travel) }, (err: any, data: any) => {
                 let part = [];
                 for (let item of data.participants) {
                     part = [...part, item.userid];
-                    req["connessione"].db(DB_NAME).collection('user').findOne({ _id: new ObjectId(item.userid) }, async (err: any, data2: any) => {
+                    mongoConnection.db(DB_NAME).collection('user').findOne({ _id: new ObjectId(item.userid) }, async (err: any, data2: any) => {
                         let messages = [];
                         for (let item of data2.notifToken) {
                             if (!Expo.isExpoPushToken(item)) {
@@ -89,7 +89,7 @@ export async function takePosts(req, res, cache, next) {
         next();
     }
     else {
-        req["connessione"].db(DB_NAME).collection("posts").aggregate([
+        mongoConnection.db(DB_NAME).collection("posts").aggregate([
             {
                 $lookup:
                 {
@@ -132,7 +132,7 @@ export function updateVote(req, res, cache, next) {
     let id = req.body.id;
     let vote = req.body.vote;
 
-    req["connessione"].db(DB_NAME).collection("posts").updateOne({ _id: new ObjectId(id) }, { $set: { votes: vote } }, function (err: any, data: any) {
+    mongoConnection.db(DB_NAME).collection("posts").updateOne({ _id: new ObjectId(id) }, { $set: { votes: vote } }, function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query");
         } else {
@@ -146,7 +146,7 @@ export function updateVote(req, res, cache, next) {
 export function takeLastsPostByUsername(req, res, cache, next) {
     let username = req.query.username;
     let userid = req.query.userid;
-    req["connessione"].db(DB_NAME).collection("travels").find({ "participants.userid": userid, "participants.username": username }).toArray(function (err: any, data: any) {
+    mongoConnection.db(DB_NAME).collection("travels").find({ "participants.userid": userid, "participants.username": username }).toArray(function (err: any, data: any) {
         if (err) {
             console.log("Errore esecuzione query");
             res.status(500).send("Errore esecuzione query");
@@ -160,7 +160,7 @@ export function takeLastsPostByUsername(req, res, cache, next) {
                 ausName.push(item.name);
             }
 
-            req["connessione"].db(DB_NAME).collection("posts").aggregate([
+            mongoConnection.db(DB_NAME).collection("posts").aggregate([
                 {
                     $lookup:
                     {
@@ -209,7 +209,7 @@ export function takeLastsPostByUsername(req, res, cache, next) {
 export function updatePayment(req, res, cache, next) {
     let id = req.body.id;
     let destinator = req.body.destinator;
-    req["connessione"].db(DB_NAME).collection("posts").updateOne({ _id: new ObjectId(id) }, { $set: { destinator: destinator } }, function (err: any, data: any) {
+    mongoConnection.db(DB_NAME).collection("posts").updateOne({ _id: new ObjectId(id) }, { $set: { destinator: destinator } }, function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query");
         } else {
@@ -223,7 +223,7 @@ export function updatePayment(req, res, cache, next) {
 export function updatePinPost(req, res, cache, next) {
     let id = req.body.param._id;
     let pinned = req.body.param.pinned;
-    let collection = req["connessione"].db(DB_NAME).collection("posts");
+    let collection = mongoConnection.db(DB_NAME).collection("posts");
     collection.updateOne({ _id: new ObjectId(id) }, { $set: { "pinned": pinned } }, function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query");
@@ -237,7 +237,7 @@ export function updatePinPost(req, res, cache, next) {
 
 export function deletePost(req, res, cache, next) {
     let id = req.body.id;
-    req["connessione"].db(DB_NAME).collection("posts").findOne({ _id: new ObjectId(id) }, function (err: any, data: any) {
+    mongoConnection.db(DB_NAME).collection("posts").findOne({ _id: new ObjectId(id) }, function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query");
             next();
@@ -258,7 +258,7 @@ export function deletePost(req, res, cache, next) {
                 }
             }
 
-            req["connessione"].db(DB_NAME).collection("posts").deleteOne({ _id: new ObjectId(id) }, function (err: any, data: any) {
+            mongoConnection.db(DB_NAME).collection("posts").deleteOne({ _id: new ObjectId(id) }, function (err: any, data: any) {
                 if (err) {
                     res.status(500).send("Errore esecuzione query");
                 } else {

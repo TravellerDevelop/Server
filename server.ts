@@ -23,6 +23,8 @@ const httpServer = http.createServer(app);
 const io = new Server(httpServer);
 const PORT = process.env.PORT || 1337;
 
+export let mongoConnection: any;
+
 const cache = new NodeCache({ stdTTL: 0, checkperiod: 120 });
 export const DB_NAME = "traveller";
 const connectionString: any = process.env.connectionString;
@@ -73,16 +75,24 @@ app.use("/", cors({
 app.set("json spaces", 4);
 
 app.use("/api/", function (req: any, res: any, next) {
-  new MongoClient(connectionString)
-    .connect()
-    .then((client: any) => {
-      req["connessione"] = client;
-      next();
-    })
-    .catch((err: any) => {
-      let msg = "Errore di connessione al db";
-      res.status(503).send(msg);
-    });
+  let safe = true;
+  if(!mongoConnection){
+    safe = false;
+    new MongoClient(connectionString)
+      .connect()
+      .then((client: any) => {
+        mongoConnection = client;
+        next();
+      })
+      .catch((err: any) => {
+        let msg = "Errore di connessione al db";
+        res.status(503).send(msg);
+      });
+  }
+
+  if(safe){
+    next();
+  }
 });
 
 app.use(fileupload({
@@ -126,13 +136,12 @@ app.post("/api/post/updatePayment", function (req: any, res: any, next: any) { u
 app.post("/api/post/updatePinPost", function (req: any, res: any, next: any) { updatePinPost(req, res, cache, next); });
 app.post("/api/post/deletePost", function (req: any, res: any, next: any) { deletePost(req, res, cache, next); });
 app.get("/api/post/takeTotalExpenses", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("posts");
+  let collection = mongoConnection.db(DB_NAME).collection("posts");
   let userid = req.query.userid;
   collection.find({ type: "payments", "destinator.userid": userid }).toArray(function (err: any, data: any) {
     if (err) {
       console.log("Errore esecuzione query");
       res.status(500).send("Errore esecuzione query");
-      req["connessione"].close();
     }
     else {
       let tot = 0;
@@ -141,20 +150,18 @@ app.get("/api/post/takeTotalExpenses", function (req: any, res: any, next) {
       }
 
       res.status(200).send(tot.toString());
-      req["connessione"].close();
     }
 
   });
 });
 
 app.get("/api/post/takeTotalToPay", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("posts");
+  let collection = mongoConnection.db(DB_NAME).collection("posts");
   let userid = req.query.userid;
   collection.find({ destinator: { $elemMatch: { userid: userid, payed: false } } }).toArray(function (err: any, data: any) {
     if (err) {
       console.log("Errore esecuzione query");
       res.status(500).send("Errore esecuzione query");
-      req["connessione"].close();
     }
     else {
       let sum = 0;
@@ -163,20 +170,18 @@ app.get("/api/post/takeTotalToPay", function (req: any, res: any, next) {
       }
 
       res.status(200).send(sum.toString());
-      req["connessione"].close();
     }
   });
 });
 
 app.get("/api/post/takeTotalToReceive", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("posts");
+  let collection = mongoConnection.db(DB_NAME).collection("posts");
   let username = req.query.username;
   let userid = req.query.userid;
   collection.find({ creator: username, type: "payments" }).toArray(function (err: any, data: any) {
     if (err) {
       console.log("Errore esecuzione query");
       res.status(500).send("Errore esecuzione query");
-      req["connessione"].close();
     }
     else {
       let sum = 0;
@@ -191,13 +196,12 @@ app.get("/api/post/takeTotalToReceive", function (req: any, res: any, next) {
       }
 
       res.status(200).send(sum.toString());
-      req["connessione"].close();
     }
   });
 });
 
 app.get("/api/post/takeTotalPayedByTravel", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("posts");
+  let collection = mongoConnection.db(DB_NAME).collection("posts");
 
   let travel = req.query.travel;
   let userid = req.query.userid;
@@ -206,7 +210,6 @@ app.get("/api/post/takeTotalPayedByTravel", function (req: any, res: any, next) 
     if (err) {
       console.log("Errore esecuzione query");
       res.status(500).send("Errore esecuzione query");
-      req["connessione"].close();
     }
     else {
       console.log(data)
@@ -217,7 +220,6 @@ app.get("/api/post/takeTotalPayedByTravel", function (req: any, res: any, next) 
       }
 
       res.status(200).send(sum.toString());
-      req["connessione"].close();
     }
   });
 });
@@ -225,7 +227,7 @@ app.get("/api/post/takeTotalPayedByTravel", function (req: any, res: any, next) 
 app.get("/api/post/takePayedGroupByTravel", function (req: any, res: any, next) {
   let userid = req.query.userid;
 
-  req["connessione"].db(DB_NAME).collection("posts").aggregate([
+  mongoConnection.db(DB_NAME).collection("posts").aggregate([
     { $match: { "destinator.userid": userid, type: "payments" } },
     { $unwind: "$destinator" },
     { $match: { "destinator.userid": userid, type: "payments" } },
@@ -239,17 +241,15 @@ app.get("/api/post/takePayedGroupByTravel", function (req: any, res: any, next) 
     if (err) {
       console.log("Errore esecuzione query");
       res.status(500).send("Errore esecuzione query");
-      req["connessione"].close();
     }
     else {
-      req["connessione"].db(DB_NAME).collection("travels").find({ _id: { $in: data.map((item: any) => item._id) } }).project({
+      mongoConnection.db(DB_NAME).collection("travels").find({ _id: { $in: data.map((item: any) => item._id) } }).project({
         _id: true,
         name: true
       }).toArray(function (err: any, data2: any) {
         if (err) {
           console.log("Errore esecuzione query");
           res.status(500).send("Errore esecuzione query");
-          req["connessione"].close();
         }
         else {
           let ausData = [];
@@ -260,7 +260,6 @@ app.get("/api/post/takePayedGroupByTravel", function (req: any, res: any, next) 
           }
 
           res.status(200).send(ausData);
-          req["connessione"].close();
         }
       });
     }
@@ -293,7 +292,7 @@ app.post("/api/post/addImage", function (req: any, res: any, next) {
 });
 
 app.post("/api/post/updateToDo", function (req: any, res: any) {
-  let collection = req["connessione"].db(DB_NAME).collection("posts");
+  let collection = mongoConnection.db(DB_NAME).collection("posts");
 
   collection.updateOne({ _id: new ObjectId(req.body.id) }, { $set: { items: req.body.items } }, function (err: any, data: any) {
     if (err) {
@@ -302,14 +301,12 @@ app.post("/api/post/updateToDo", function (req: any, res: any) {
     else {
       res.status(200).send(data);
     }
-
-    req["connessione"].close();
   });
 })
 
 // GESTIONE FOLLOW
 app.post("/api/follow/create", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("follow");
+  let collection = mongoConnection.db(DB_NAME).collection("follow");
 
   collection.insertOne({
     from: req.body.from,
@@ -321,8 +318,6 @@ app.post("/api/follow/create", function (req: any, res: any, next) {
     } else {
       res.status(200).send(data);
     }
-
-    req["connessione"].close();
   });
 });
 
@@ -330,15 +325,13 @@ app.get("/api/follow/takeFromTo", function (req: any, res: any, next) {
   let from = req.query.from;
   let to = req.query.to;
 
-  req["connessione"].db(DB_NAME).collection("follow").find({ from: from, to: to }).toArray(function (err: any, data: any) {
+  mongoConnection.db(DB_NAME).collection("follow").find({ from: from, to: to }).toArray(function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore esecuzione query");
     }
     else {
       res.status(200).send(data);
     }
-
-    req["connessione"].close();
   })
 });
 
@@ -346,7 +339,7 @@ app.post("/api/follow/delete", function (req: any, res: any, next) {
   let from = req.body.from;
   let to = req.body.to;
 
-  let collection = req["connessione"].db(DB_NAME).collection("follow");
+  let collection = mongoConnection.db(DB_NAME).collection("follow");
 
   collection.deleteOne({ from: from, to: to }, function (err: any, data: any) {
     if (err) {
@@ -355,15 +348,13 @@ app.post("/api/follow/delete", function (req: any, res: any, next) {
     else {
       res.status(200).send(data);
     }
-
-    req["connessione"].close();
   })
 });
 
 app.get("/api/follow/takeFollowersRequest", function (req: any, res: any, next) {
   let to = req.query.to;
 
-  let collection = req["connessione"].db(DB_NAME).collection("follow");
+  let collection = mongoConnection.db(DB_NAME).collection("follow");
   collection.find({ to: to, accepted: false }).toArray(function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore esecuzione query");
@@ -371,8 +362,6 @@ app.get("/api/follow/takeFollowersRequest", function (req: any, res: any, next) 
     else {
       res.status(200).send(data);
     }
-
-    req["connessione"].close();
   })
 });
 
@@ -380,7 +369,7 @@ app.post("/api/follow/accept", function (req: any, res: any, next) {
   let from = req.body.from;
   let to = req.body.to;
 
-  let collection = req["connessione"].db(DB_NAME).collection("follow");
+  let collection = mongoConnection.db(DB_NAME).collection("follow");
 
   collection.updateOne({ from: from, to: to }, { $set: { accepted: true } }, function (err: any, data: any) {
     if (err) {
@@ -389,8 +378,6 @@ app.post("/api/follow/accept", function (req: any, res: any, next) {
     else {
       res.status(200).send(data);
     }
-
-    req["connessione"].close();
   })
 });
 
@@ -399,11 +386,11 @@ app.get("/api/follow/takeFollowings", function (req: any, res: any) { takeFollow
 app.get("/api/follow/takeFollowingsWithInfo", function (req: any, res: any) { takeFollowingsWithInfo(req, res, cache) });
 
 app.get("/api/utility", (req, res, next) => {
-  req["connessione"].db(DB_NAME).collection("travels").find()
+  mongoConnection.db(DB_NAME).collection("travels").find()
     .toArray((err, response) => {
       if (!err) {
         for (let item of response) {
-          req["connessione"].db(DB_NAME).collection("posts").updateMany({ travel: item._id.toString() }, { $set: { travel: item._id } })
+          mongoConnection.db(DB_NAME).collection("posts").updateMany({ travel: item._id.toString() }, { $set: { travel: item._id } })
             .then(() => {
               console.log("Successo per " + item.name);
             })
@@ -417,11 +404,11 @@ app.get("/api/utility", (req, res, next) => {
       }
     })
 
-  req["connessione"].db(DB_NAME).collection("user").find()
+  mongoConnection.db(DB_NAME).collection("user").find()
     .toArray((err, response) => {
       if (!err) {
         for (let item of response) {
-          req["connessione"].db(DB_NAME).collection("posts").updateMany({ creator: item.username }, { $set: { creator: item._id } })
+          mongoConnection.db(DB_NAME).collection("posts").updateMany({ creator: item.username }, { $set: { creator: item._id } })
             .then(() => {
               console.log("Successo per " + item.username);
             })
@@ -438,7 +425,7 @@ app.get("/api/utility", (req, res, next) => {
 
 // Gestione ticket
 app.post("/api/tickets/create", function (req: any, res: any, next) {
-  let collection = req["connessione"].db(DB_NAME).collection("tickets");
+  let collection = mongoConnection.db(DB_NAME).collection("tickets");
   let param = req.body.data;
   param.date = new Date(param.date);
   collection.insertOne(param, function (err: any, data: any) {
@@ -448,8 +435,6 @@ app.post("/api/tickets/create", function (req: any, res: any, next) {
       res.status(200).send(data);
       cache.del("tickets=" + param.createor)
     }
-
-    req["connessione"].close();
   });
 });
 
@@ -461,7 +446,7 @@ app.get("/api/tickets/take", function (req: any, res: any, next) {
     cache.set("tickets=" + userid, cachedData, 600);
   }
   else {
-    req["connessione"].db(DB_NAME).collection("tickets").find({ creator: userid }).sort({ date: -1 }).toArray(function (err: any, data: any) {
+    mongoConnection.db(DB_NAME).collection("tickets").find({ creator: userid }).sort({ date: -1 }).toArray(function (err: any, data: any) {
       if (err) {
         res.status(500).send("Errore esecuzione query");
       }
@@ -469,8 +454,6 @@ app.get("/api/tickets/take", function (req: any, res: any, next) {
         res.status(200).send(data);
         cache.set("tickets=" + userid, data, 600);
       }
-
-      req["connessione"].close();
     });
   }
 });
@@ -478,15 +461,13 @@ app.get("/api/tickets/take", function (req: any, res: any, next) {
 app.post("/api/tickets/delete", function (req: any, res: any, next) {
   let id = req.body.id;
 
-  let collection = req["connessione"].db(DB_NAME).collection("tickets");
+  let collection = mongoConnection.db(DB_NAME).collection("tickets");
   collection.deleteOne({ _id: new ObjectId(id) }, function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore esecuzione query 1");
     } else {
       res.status(200).send(data);
     }
-
-    req["connessione"].close();
   });
 });
 
@@ -498,15 +479,13 @@ app.post("/api/tickets/share", function (req: any, res: any, next) {
   content.creator = id;
   content.sharedBy = createBy;
 
-  let collection = req["connessione"].db(DB_NAME).collection("tickets");
+  let collection = mongoConnection.db(DB_NAME).collection("tickets");
   collection.insertOne(content, function (err: any, data: any) {
     if (err) {
       res.status(500).send("Errore esecuzione query 1");
     } else {
       res.status(200).send(data);
     }
-
-    req["connessione"].close();
   });
 })
 
@@ -549,5 +528,18 @@ io.on('connection', (socket: Socket) => {
 });
 
 app.use("/api/", function (req: any, res: any, next) {
-  req["connessione"].close();
 });
+
+startConnection();
+
+function startConnection(){
+  new MongoClient(connectionString)
+  .connect()
+  .then((client: any) => {
+        console.log("Started connection")
+        mongoConnection = client;
+      })
+      .catch((err: any) => {
+        let msg = "Errore di connessione al db";
+      });
+}

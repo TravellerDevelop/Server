@@ -1,9 +1,9 @@
 import { ObjectId } from "mongodb";
-import { DB_NAME } from "../server";
+import { DB_NAME, mongoConnection } from "../server";
 import NodeCache from "node-cache";
 
 export function verifyConnection(req: Request, res: any, next: any) {
-    let collection = req["connessione"].db(DB_NAME).collection("test");
+    let collection = mongoConnection.db(DB_NAME).collection("test");
     collection.find({}).toArray(function (err: any, data: any) {
         if (err) {
             console.log(err)
@@ -25,7 +25,7 @@ export function takeVersion(req: Request, res: any, cache: NodeCache, next:any) 
         next();
     }
     else {
-        let collection = req["connessione"].db(DB_NAME).collection("test");
+        let collection = mongoConnection.db(DB_NAME).collection("test");
         collection.find({ _id: new ObjectId("646f82d1e77fa64f3e358dd1") }).toArray(function (err: any, data: any) {
             if (err) {
                 res.send("Errore nella connessione al database").status(500);

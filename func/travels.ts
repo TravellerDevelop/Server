@@ -1,10 +1,10 @@
 import { ObjectId } from "mongodb";
 import NodeCache from "node-cache";
-import { DB_NAME } from "../server";
+import { DB_NAME, mongoConnection } from "../server";
 import fs from "fs";
 
 export function createTravel(req: any, res: any, cache: any, next) {
-    let collection = req["connessione"].db(DB_NAME).collection("travels");
+    let collection = mongoConnection.db(DB_NAME).collection("travels");
     let param: any = req.body;
     param.creation_date = new Date(param.creation_date);
 
@@ -19,7 +19,7 @@ export function createTravel(req: any, res: any, cache: any, next) {
 }
 
 export function joinTravel(req: any, res: any, cache: NodeCache, next) {
-    let collection = req["connessione"].db(DB_NAME).collection("travels");
+    let collection = mongoConnection.db(DB_NAME).collection("travels");
     let error = false;
     collection.find({ code: req.body.code })
         .toArray(function (err: any, data: any) {
@@ -80,7 +80,7 @@ export function takeJoinedTravels(req: any, res: any, cache: any, next) {
         res.send(cachedData).status(200);
         next();
     } else {
-        req["connessione"].db(DB_NAME).collection("travels").find({ "participants.userid": userid, "participants.username": username, closed: false }).sort({ creation_date: -1 }).toArray(function (err: any, data: any) {
+        mongoConnection.db(DB_NAME).collection("travels").find({ "participants.userid": userid, "participants.username": username, closed: false }).sort({ creation_date: -1 }).toArray(function (err: any, data: any) {
             if (err) {
                 res.status(500).send("Errore esecuzione query");
             }
@@ -96,7 +96,7 @@ export function takeJoinedTravels(req: any, res: any, cache: any, next) {
 export function takeTravelsParticipants(req: any, res: any, cache: any, next) {
     let travel = req.query.travel;
     let cachedData = cache.get("takeParticipants=" + travel);
-    let collection = req["connessione"].db(DB_NAME).collection("travels");
+    let collection = mongoConnection.db(DB_NAME).collection("travels");
     if (cachedData) {
         cache.set("takeParticipants=" + travel, cachedData, 600);
         res.send(cachedData).status(200);
@@ -114,7 +114,7 @@ export function takeTravelsParticipants(req: any, res: any, cache: any, next) {
                     participants.push(item.username);
                 }
 
-                let collection2 = req["connessione"].db(DB_NAME).collection("user");
+                let collection2 = mongoConnection.db(DB_NAME).collection("user");
                 collection2.find({ username: { $in: participants } }).toArray(function (err: any, data: any) {
                     if (err) {
                         res.status(500).send("Errore esecuzione query");
@@ -133,7 +133,7 @@ export function takeTravelsParticipants(req: any, res: any, cache: any, next) {
 export function takeTravelByCreator(req: any, res: any, cache: any, next) {
     let username = req.query.username;
     let cachedData = cache.get("takeByCreator=" + username);
-    let collection = req["connessione"].db(DB_NAME).collection("travels");
+    let collection = mongoConnection.db(DB_NAME).collection("travels");
     if (cachedData) {
         cache.set("takeByCreator=" + username, cachedData, 600);
         res.send(cachedData).status(200);
@@ -156,7 +156,7 @@ export function updateTravel(req: any, res: any, next) {
     let param = req.body.param;
     let id = req.body.id;
 
-    req["connessione"].db(DB_NAME).collection("travels").updateOne({ _id: new ObjectId(id) }, { $set: { name: param.name, description: param.description, budget: param.budget } }, function (err: any, data: any) {
+    mongoConnection.db(DB_NAME).collection("travels").updateOne({ _id: new ObjectId(id) }, { $set: { name: param.name, description: param.description, budget: param.budget } }, function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query 1");
         }
@@ -169,7 +169,7 @@ export function updateTravel(req: any, res: any, next) {
 
 export function closeTravel(req: any, res: any, next) {
     let id = req.body.id;
-    req["connessione"].db(DB_NAME).collection("travels").updateOne({ _id: new ObjectId(id) }, { $set: { closed: true } }, function (err: any, data: any) {
+    mongoConnection.db(DB_NAME).collection("travels").updateOne({ _id: new ObjectId(id) }, { $set: { closed: true } }, function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query 1");
         }
@@ -180,7 +180,7 @@ export function closeTravel(req: any, res: any, next) {
 
 export function deleteTravel(req: any, res: any, next) {
     let id = req.body.id;
-    req["connessione"].db(DB_NAME).collection("travels").find({ _id: new ObjectId(id) }).toArray(function (err: any, data: any) {
+    mongoConnection.db(DB_NAME).collection("travels").find({ _id: new ObjectId(id) }).toArray(function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query 1");
             next();
@@ -194,13 +194,13 @@ export function deleteTravel(req: any, res: any, next) {
                     }
                 });
             }
-            req["connessione"].db(DB_NAME).collection("travels").deleteOne({ _id: new ObjectId(id) }, function (err: any, data: any) {
+            mongoConnection.db(DB_NAME).collection("travels").deleteOne({ _id: new ObjectId(id) }, function (err: any, data: any) {
                 if (err) {
                     res.status(500).send("Errore esecuzione query 1");
                     next();
                 }
                 else {
-                    req["connessione"].db(DB_NAME).collection("posts").deleteMany({ travel: id }, function (err: any, data: any) {
+                    mongoConnection.db(DB_NAME).collection("posts").deleteMany({ travel: id }, function (err: any, data: any) {
                         if (err) {
                             res.status(500).send("Errore esecuzione query 1");
                         }
@@ -219,20 +219,20 @@ export function leaveTravel(req: any, res: any, cache: any, next) {
     let travel = req.body.travel;
     let userid = req.body.userid;
 
-    req["connessione"].db(DB_NAME).collection("travels").findOne({ _id: new ObjectId(travel) }, function (err: any, data: any) {
+    mongoConnection.db(DB_NAME).collection("travels").findOne({ _id: new ObjectId(travel) }, function (err: any, data: any) {
         if (err) {
             res.status(500).send("Errore esecuzione query 1");
             next();
         }
         else {
             if (data.participants.length == 1) {
-                req["connessione"].db(DB_NAME).collection("travels").deleteOne({ _id: new ObjectId(travel) }, function (err: any, data: any) {
+                mongoConnection.db(DB_NAME).collection("travels").deleteOne({ _id: new ObjectId(travel) }, function (err: any, data: any) {
                     if (err) {
                         res.status(500).send("Errore esecuzione query 1");
                         next();
                     }
                     else {
-                        req["connessione"].db(DB_NAME).collection("posts").deleteMany({ travel: travel }, function (err: any, data: any) {
+                        mongoConnection.db(DB_NAME).collection("posts").deleteMany({ travel: travel }, function (err: any, data: any) {
                             if (err) {
                                 res.status(500).send("Errore esecuzione query 1");
                             }
@@ -246,7 +246,7 @@ export function leaveTravel(req: any, res: any, cache: any, next) {
             }
             else {
                 let aus = data.participants.filter((item: any) => item.userid != userid);
-                req["connessione"].db(DB_NAME).collection("travels").updateOne({ _id: new ObjectId(travel) }, { $set: { participants: aus } }, function (err: any, data: any) {
+                mongoConnection.db(DB_NAME).collection("travels").updateOne({ _id: new ObjectId(travel) }, { $set: { participants: aus } }, function (err: any, data: any) {
                     if (err) {
                         res.status(500).send("Errore esecuzione query 1");
                     }
