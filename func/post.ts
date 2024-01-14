@@ -36,39 +36,41 @@ export function createPost(req, res, cache, next) {
                     part = [...part, item.userid];
                     mongoConnection.db(DB_NAME).collection('user').findOne({ _id: new ObjectId(item.userid) }, async (err: any, data2: any) => {
                         let messages = [];
-                        for (let item of data2.notifToken) {
-                            if (!Expo.isExpoPushToken(item)) {
-                                console.error(`Push token ${item} is not a valid Expo push token`);
-                                continue;
-                            }
-
-                            messages.push({
-                                to: item,
-                                sound: 'default',
-                                body: param.creator + ' ha pubblicato qualcosa! 🪁🪁',
-                                data: { withSome: 'data' },
-                            })
-
-                            let chunks = expo.chunkPushNotifications(messages);
-                            let tickets = [];
-                            (async () => {
-                                // Send the chunks to the Expo push notification service. There are
-                                // different strategies you could use. A simple one is to send one chunk at a
-                                // time, which nicely spreads the load out over time:
-                                for (let chunk of chunks) {
-                                    try {
-                                        let ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-                                        tickets.push(...ticketChunk);
-                                        // NOTE: If a ticket contains an error code in ticket.details.error, you
-                                        // must handle it appropriately. The error codes are listed in the Expo
-                                        // documentation:
-                                        // https://docs.expo.io/push-notifications/sending-notifications/#individual-errors
-                                    } catch (error) {
-                                        console.error(error);
-                                    }
+                        if (data2.notifToken) {
+                            for (let item of data2.notifToken) {
+                                if (!Expo.isExpoPushToken(item)) {
+                                    console.error(`Push token ${item} is not a valid Expo push token`);
+                                    continue;
                                 }
-                            })();
 
+                                messages.push({
+                                    to: item,
+                                    sound: 'default',
+                                    body: param.creator + ' ha pubblicato qualcosa! 🪁🪁',
+                                    data: { withSome: 'data' },
+                                })
+
+                                let chunks = expo.chunkPushNotifications(messages);
+                                let tickets = [];
+                                (async () => {
+                                    // Send the chunks to the Expo push notification service. There are
+                                    // different strategies you could use. A simple one is to send one chunk at a
+                                    // time, which nicely spreads the load out over time:
+                                    for (let chunk of chunks) {
+                                        try {
+                                            let ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+                                            tickets.push(...ticketChunk);
+                                            // NOTE: If a ticket contains an error code in ticket.details.error, you
+                                            // must handle it appropriately. The error codes are listed in the Expo
+                                            // documentation:
+                                            // https://docs.expo.io/push-notifications/sending-notifications/#individual-errors
+                                        } catch (error) {
+                                            console.error(error);
+                                        }
+                                    }
+                                })();
+
+                            }
                         }
                         res.status(200).send(data);
                     })

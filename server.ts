@@ -253,10 +253,11 @@ app.get("/api/post/takePayedGroupByTravel", function (req: any, res: any, next) 
         }
         else {
           let ausData = [];
-          for (let item of data2) {
-            console.log(data.filter((item2: any) => item2._id.toString() == item._id.toString()))
-            let aus = data.filter((item2: any) => item2._id.toString() == item._id.toString())
-            ausData.push({ name: item.name, total: (JSON.stringify(aus) != '[]') ? aus[0].total : 0 });
+          if(data2){
+            for (let item of data2) {
+              let aus = data.filter((item2: any) => item2._id.toString() == item._id.toString())
+              ausData.push({ name: item.name, total: (JSON.stringify(aus) != '[]') ? aus[0].total : 0 });
+            }
           }
 
           res.status(200).send(ausData);
@@ -503,7 +504,7 @@ io.on('connection', (socket: Socket) => {
       console.log('Joined in: travel='+user.travelId)
     }
   })
-
+  
   socket.on('leaveTravel', (user) => {
     socket.leave(user.travel);
     if(ISDEBUG){
@@ -512,7 +513,16 @@ io.on('connection', (socket: Socket) => {
   });
 
   socket.on("newpost", (data) => {
-    io.to('travel='+user.travelId).emit("NewPostFromServer", data)
+    console.log('travel='+user.travelId)
+    socket.to('travel='+user.travelId).emit("NewPostFromServer", data)
+  })
+
+  socket.on("changedCheckbox", (data) => {
+    socket.to('travel='+user.travelId).emit("changedCheckbox="+data._id, data);
+  })
+
+  socket.on('deletePost', (data) => {
+    socket.to('travel='+user.travelId).emit("deletedPost", data);
   })
 
   // Esempio di gestione di un evento personalizzato
