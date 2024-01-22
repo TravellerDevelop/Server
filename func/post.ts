@@ -146,9 +146,8 @@ export function updateVote(req, res, cache, next) {
 }
 
 export function takeLastsPostByUsername(req, res, cache, next) {
-    let username = req.query.username;
     let userid = req.query.userid;
-    mongoConnection.db(DB_NAME).collection("travels").find({ "participants.userid": userid, "participants.username": username }).toArray(function (err: any, data: any) {
+    mongoConnection.db(DB_NAME).collection("travels").find({ "participants.userid": new ObjectId(userid) }).toArray(function (err: any, data: any) {
         if (err) {
             console.log("Errore esecuzione query");
             res.status(500).send("Errore esecuzione query");
