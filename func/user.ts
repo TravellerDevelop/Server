@@ -89,10 +89,11 @@ export function takeTravelsNum(req: any, res: any, cache: NodeCache, next) {
         next();
     }
     else {
-        mongoConnection.db(DB_NAME).collection("travels").countDocuments({ "participants": { "$elemMatch": { "userid": userid, "creator": true } } }, { "participants.$": 1 }).then(function (data: any) {
+        mongoConnection.db(DB_NAME).collection("travels")
+        .countDocuments({ "participants": { "$elemMatch": { "userid": new ObjectId(userid), "creator": true } } }, { "participants.$": 1 })
+        .then(function (data: any) {
             cache.set("travelsNum-id=" + userid, { count: data }, 600);
             res.send({ count: data }).status(200);
-            next();
         })
             .catch((ex) => {
                 console.log(ex);

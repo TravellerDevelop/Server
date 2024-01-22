@@ -76,7 +76,7 @@ app.set("json spaces", 4);
 
 app.use("/api/", function (req: any, res: any, next) {
   let safe = true;
-  if(!mongoConnection){
+  if (!mongoConnection) {
     safe = false;
     new MongoClient(connectionString)
       .connect()
@@ -90,7 +90,7 @@ app.use("/api/", function (req: any, res: any, next) {
       });
   }
 
-  if(safe){
+  if (safe) {
     next();
   }
 });
@@ -116,10 +116,10 @@ app.post("/api/user/setNotifToken", function (req: any, res: any, next: any) { s
 app.post("/api/user/verifyToken", function (req: any, res: any, next: any) { verifyToken(req, res, cache, next); });
 
 // GESTIONE TRAVELS
-app.post("/api/travel/create", function (req: any, res: any, next: any) { createTravel(req, res, cache, next); });
+app.post("/api/travel/create", function (req: any, res: any) { createTravel(req, res, cache); });
 app.post("/api/travel/join", function (req: any, res: any, next: any) { joinTravel(req, res, cache, next); });
 app.get("/api/travel/takeJoined", function (req: any, res: any, next: any) { takeJoinedTravels(req, res, cache, next); });
-app.get("/api/travel/takeParticipants", (req: any, res: any, next: any) => { takeTravelsParticipants(req, res, cache, next);; });
+app.get("/api/travel/takeParticipants", (req: any, res: any) => { takeTravelsParticipants(req, res, cache); });
 app.get("/api/travel/takeByCreator", function (req: any, res: any, next: any) { takeTravelByCreator(req, res, cache, next); });
 app.post("/api/travel/update", function (req: any, res: any, next: any) { updateTravel(req, res, next); });
 app.post("/api/travel/close", function (req: any, res: any, next: any) { closeTravel(req, res, next); });
@@ -253,7 +253,7 @@ app.get("/api/post/takePayedGroupByTravel", function (req: any, res: any, next) 
         }
         else {
           let ausData = [];
-          if(data2){
+          if (data2) {
             for (let item of data2) {
               let aus = data.filter((item2: any) => item2._id.toString() == item._id.toString())
               ausData.push({ name: item.name, total: (JSON.stringify(aus) != '[]') ? aus[0].total : 0 });
@@ -387,47 +387,68 @@ app.get("/api/follow/takeFollowings", function (req: any, res: any) { takeFollow
 app.get("/api/follow/takeFollowingsWithInfo", function (req: any, res: any) { takeFollowingsWithInfo(req, res, cache) });
 
 app.get("/api/utility", (req, res, next) => {
-  mongoConnection.db(DB_NAME).collection("travels").find()
-    .toArray((err, response) => {
-      if (!err) {
-        for (let item of response) {
-          mongoConnection.db(DB_NAME).collection("posts").updateMany({ travel: item._id.toString() }, { $set: { travel: item._id } })
-            .then(() => {
-              console.log("Successo per " + item.name);
-            })
-            .catch(() => {
-              console.log("Fallimento per " + item.name);
-            })
-        }
-      }
-      else {
-        console.log('Errore 1');
-      }
-    })
 
-  mongoConnection.db(DB_NAME).collection("user").find()
-    .toArray((err, response) => {
-      if (!err) {
-        for (let item of response) {
-          mongoConnection.db(DB_NAME).collection("posts").updateMany({ creator: item.username }, { $set: { creator: item._id } })
-            .then(() => {
-              console.log("Successo per " + item.username);
-            })
-            .catch(() => {
-              console.log("Fallimento per " + item.username);
-            })
-        }
-      }
-      else {
-        console.log('Errore 1');
-      }
+  mongoConnection.db(DB_NAME).collection("travels").find().toArray()
+    .then((documents) => {
+      documents.forEach((doc) => {
+        const participants = doc.participants.map((participant) => {
+          participant.userid = new ObjectId(participant.userid);
+          delete participant.username;
+          return participant;
+        });
+
+        mongoConnection.db(DB_NAME).collection("travels").updateOne(
+          { _id: doc._id },
+          { $set: { participants: participants } }
+        );
+      });
     })
+    .catch((err) => {
+      res.status(500).send(err);
+    });
+
+  // mongoConnection.db(DB_NAME).collection("tickets").find()
+  //   .toArray((err, response) => {
+  //     if (!err) {
+  //       for (let item of response) {
+  //         mongoConnection.db(DB_NAME).collection("tickets").updateOne({ _id: item._id }, { $set: { creator: new ObjectId(item.creator) } })
+  //           .then(() => {
+  //             console.log("Successo per " + item.name);
+  //           })
+  //           .catch(() => {
+  //             console.log("Fallimento per " + item.name);
+  //           })
+  //       }
+  //     }
+  //     else {
+  //       console.log('Errore 1');
+  //     }
+  //   })
+
+  // mongoConnection.db(DB_NAME).collection("user").find()
+  //   .toArray((err, response) => {
+  //     if (!err) {
+  //       for (let item of response) {
+  //         mongoConnection.db(DB_NAME).collection("posts").updateMany({ creator: item.username }, { $set: { creator: item._id } })
+  //           .then(() => {
+  //             console.log("Successo per " + item.username);
+  //           })
+  //           .catch(() => {
+  //             console.log("Fallimento per " + item.username);
+  //           })
+  //       }
+  //     }
+  //     else {
+  //       console.log('Errore 1');
+  //     }
+  //   })
 })
 
 // Gestione ticket
 app.post("/api/tickets/create", function (req: any, res: any, next) {
   let collection = mongoConnection.db(DB_NAME).collection("tickets");
   let param = req.body.data;
+  param.creator = new ObjectId(param.creator);
   param.date = new Date(param.date);
   collection.insertOne(param, function (err: any, data: any) {
     if (err) {
@@ -447,11 +468,41 @@ app.get("/api/tickets/take", function (req: any, res: any, next) {
     cache.set("tickets=" + userid, cachedData, 600);
   }
   else {
-    mongoConnection.db(DB_NAME).collection("tickets").find({ creator: userid }).sort({ date: -1 }).toArray(function (err: any, data: any) {
+    mongoConnection.db(DB_NAME).collection("tickets").aggregate([
+      {
+        $match: {
+          creator: new ObjectId(userid)
+        }
+      },
+      {
+        $lookup: {
+          from: "user",
+          localField: "sharedBy",
+          foreignField: "_id",
+          as: "sharedBy"
+        }
+      },
+      {
+        $project: {
+          "sharedBy._id": 0,
+          "sharedBy.name": 0,
+          "sharedBy.surname": 0,
+          "sharedBy.password": 0,
+          "sharedBy.email": 0,
+          "sharedBy.notifToken": 0,
+        }
+      }
+    ]).toArray(function (err: any, data: any) {
       if (err) {
         res.status(500).send("Errore esecuzione query");
       }
       else {
+        for (let item of data) {
+          if (item.sharedBy.length > 0)
+            item.sharedBy = item.sharedBy[0].username;
+          else
+            delete item.sharedBy;
+        }
         res.status(200).send(data);
         cache.set("tickets=" + userid, data, 600);
       }
@@ -477,8 +528,8 @@ app.post("/api/tickets/share", function (req: any, res: any, next) {
   let content = req.body.content;
   let createBy = req.body.createBy;
 
-  content.creator = id;
-  content.sharedBy = createBy;
+  content.creator = new ObjectId(id);
+  content.sharedBy = new ObjectId(createBy);
 
   let collection = mongoConnection.db(DB_NAME).collection("tickets");
   collection.insertOne(content, function (err: any, data: any) {
@@ -494,35 +545,35 @@ app.post("/api/tickets/share", function (req: any, res: any, next) {
 let users = [];
 io.on('connection', (socket: Socket) => {
   console.log('A user connected');
-  let user:any = {};
+  let user: any = {};
 
   socket.on("joinTravel", async (clientUser) => {
     user = clientUser;
     users.push(user);
-    socket.join('travel='+user.travelId);
-    if(ISDEBUG){
-      console.log('Joined in: travel='+user.travelId)
+    socket.join('travel=' + user.travelId);
+    if (ISDEBUG) {
+      console.log('Joined in: travel=' + user.travelId)
     }
   })
-  
+
   socket.on('leaveTravel', (user) => {
     socket.leave(user.travel);
-    if(ISDEBUG){
-      console.log('Left from: '+user.travel)
+    if (ISDEBUG) {
+      console.log('Left from: ' + user.travel)
     }
   });
 
   socket.on("newpost", (data) => {
-    console.log('travel='+user.travelId)
-    socket.to('travel='+user.travelId).emit("NewPostFromServer", data)
+    console.log('travel=' + user.travelId)
+    socket.to('travel=' + user.travelId).emit("NewPostFromServer", data)
   })
 
   socket.on("changedCheckbox", (data) => {
-    socket.to('travel='+user.travelId).emit("changedCheckbox="+data._id, data);
+    socket.to('travel=' + user.travelId).emit("changedCheckbox=" + data._id, data);
   })
 
   socket.on('deletePost', (data) => {
-    socket.to('travel='+user.travelId).emit("deletedPost", data);
+    socket.to('travel=' + user.travelId).emit("deletedPost", data);
   })
 
   // Esempio di gestione di un evento personalizzato
@@ -542,14 +593,14 @@ app.use("/api/", function (req: any, res: any, next) {
 
 startConnection();
 
-function startConnection(){
+function startConnection() {
   new MongoClient(connectionString)
-  .connect()
-  .then((client: any) => {
-        console.log("Started connection")
-        mongoConnection = client;
-      })
-      .catch((err: any) => {
-        let msg = "Errore di connessione al db";
-      });
+    .connect()
+    .then((client: any) => {
+      console.log("Started connection")
+      mongoConnection = client;
+    })
+    .catch((err: any) => {
+      let msg = "Errore di connessione al db";
+    });
 }

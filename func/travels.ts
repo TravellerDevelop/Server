@@ -3,10 +3,17 @@ import NodeCache from "node-cache";
 import { DB_NAME, mongoConnection } from "../server";
 import fs from "fs";
 
-export function createTravel(req: any, res: any, cache: any, next) {
+export function createTravel(req: any, res: any, cache: any) {
     let collection = mongoConnection.db(DB_NAME).collection("travels");
     let param: any = req.body;
     param.creation_date = new Date(param.creation_date);
+
+    let i = 0;
+
+    while (i < param.participants.length) {
+        param.participants[i].userid = new ObjectId(param.participants[i].userid);
+        i++;
+    }
 
     collection.insertOne(param, function (err: any, data: any) {
         if (err) {
@@ -14,7 +21,6 @@ export function createTravel(req: any, res: any, cache: any, next) {
         } else {
             res.status(200).send(data);
         }
-        next();
     });
 }
 
@@ -50,7 +56,7 @@ export function joinTravel(req: any, res: any, cache: NodeCache, next) {
                             }
                             else {
                                 if (!error) {
-                                    collection.updateOne({ code: req.body.code }, { $push: { participants: { userid: req.body.userid, username: req.body.username } } }, function (err: any, data: any) {
+                                    collection.updateOne({ code: req.body.code }, { $push: { participants: { userid: new ObjectId(req.body.userid) } } }, function (err: any, data: any) {
                                         if (err) {
                                             res.status(500).send("Errore esecuzione query");
                                         } else {
@@ -80,7 +86,7 @@ export function takeJoinedTravels(req: any, res: any, cache: any, next) {
         res.send(cachedData).status(200);
         next();
     } else {
-        mongoConnection.db(DB_NAME).collection("travels").find({ "participants.userid": userid, "participants.username": username, closed: false }).sort({ creation_date: -1 }).toArray(function (err: any, data: any) {
+        mongoConnection.db(DB_NAME).collection("travels").find({ "participants.userid": new ObjectId(userid), closed: false }).sort({ creation_date: -1 }).toArray(function (err: any, data: any) {
             if (err) {
                 res.status(500).send("Errore esecuzione query");
             }
@@ -93,61 +99,62 @@ export function takeJoinedTravels(req: any, res: any, cache: any, next) {
     }
 }
 
-export function takeTravelsParticipants(req: any, res: any, cache: any, next) {
+export function takeTravelsParticipants(req: any, res: any, cache: any) {
     let travel = req.query.travel;
     let cachedData = cache.get("takeParticipants=" + travel);
-    let collection = mongoConnection.db(DB_NAME).collection("travels");
     if (cachedData) {
         cache.set("takeParticipants=" + travel, cachedData, 600);
         res.send(cachedData).status(200);
-        next();
     } else {
-        collection.find({ code: travel }).toArray(function (err: any, data: any) {
+        mongoConnection.db(DB_NAME).collection("travels").aggregate([
+            { $match: { _id: new ObjectId(travel) } },
+            { $unwind: "$participants" },
+            {
+                $lookup: {
+                    from: "user",
+                    localField: "participants.userid",
+                    foreignField: "_id",
+                    as: "participants"
+                }
+            },
+            { $unwind: "$participants" },
+            {
+                $project: {
+                    _id: "$participants._id",
+                    username: "$participants.username",
+                    name: "$participants.name",
+                    surname: "$participants.surname",
+                }
+            }
+        ]).toArray(function (err: any, data: any) {
             if (err) {
                 res.status(500).send("Errore esecuzione query");
-                next();
             }
             else {
-                let participants = [];
-
-                for (let item of data[0].participants) {
-                    participants.push(item.username);
-                }
-
-                let collection2 = mongoConnection.db(DB_NAME).collection("user");
-                collection2.find({ username: { $in: participants } }).toArray(function (err: any, data: any) {
-                    if (err) {
-                        res.status(500).send("Errore esecuzione query");
-                    }
-                    else {
-                        cache.set("takeParticipants=" + travel, data, 600);
-                        res.status(200).send(data);
-                    }
-                    next();
-                });
+                cache.set("takeParticipants=" + travel, data, 600);
+                res.status(200).send(data);
             }
         });
     }
 }
 
 export function takeTravelByCreator(req: any, res: any, cache: any, next) {
-    let username = req.query.username;
-    let cachedData = cache.get("takeByCreator=" + username);
-    let collection = mongoConnection.db(DB_NAME).collection("travels");
+    let userid = req.query.userid;
+    let cachedData = cache.get("takeByCreator=" + userid);
     if (cachedData) {
-        cache.set("takeByCreator=" + username, cachedData, 600);
+        cache.set("takeByCreator=" + userid, cachedData, 600);
         res.send(cachedData).status(200);
-        next();
     } else {
-        collection.find({ "participants": { "$elemMatch": { "username": username, "creator": true } } }, { "participants.$": 1 }).sort({ creation_date: -1 }).toArray(function (err: any, data: any) {
+        mongoConnection.db(DB_NAME).collection("travels")
+        .find({ "participants": { "$elemMatch": { userid: new ObjectId(userid), creator: true } } }, { "participants.$": 1 }).sort({ creation_date: -1 })
+        .toArray(function (err: any, data: any) {
             if (err) {
                 res.status(500).send("Errore esecuzione query");
             }
             else {
-                cache.set("takeByCreator=" + username, data, 600);
+                cache.set("takeByCreator=" + userid, data, 600);
                 res.status(200).send(data);
             }
-            next();
         });
     }
 }
