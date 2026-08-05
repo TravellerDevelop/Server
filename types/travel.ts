@@ -58,7 +58,7 @@ export interface TravelDocument {
      * func/travels.ts#uploadImage). Nei documenti creati prima della
      * migrazione a S3 può ancora contenere il vecchio nome file locale
      * (servito da ./static/userImage/) finché non viene aggiornato da
-     * migrateImagesToS3 (func/utility.ts).
+     * migrateImagesToS3 (scripts/migrateImagesToS3.ts).
      */
     image?: string;
     /** Destinazione testuale (es. "Roma"); assente nei viaggi creati prima dell'itinerario. */

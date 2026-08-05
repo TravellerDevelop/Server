@@ -8,13 +8,13 @@ import { UserDocument } from "../types/user";
  * questa modifica (il digest SHA-256 mandato dal client, salvato così com'era
  * — vedi func/passwordHash.ts per il perché è un problema).
  *
- * PERCHÉ UNO SCRIPT A PARTE E NON UNA ROTTA /api/utility COME LE ALTRE
- * MIGRAZIONI (func/utility.ts). Le migrazioni esposte via HTTP in questo
- * progetto sono già un rischio noto (endpoint raggiungibile da chiunque
- * abbia un token valido, vedi la security review): va bene per rimescolare
- * partecipanti o url di immagini, non per una migrazione che tocca le
- * password di ogni utente. Questo script si connette a Mongo per conto suo
- * e va lanciato a mano, una volta, da chi ha accesso al server/al .env.
+ * PERCHÉ UNO SCRIPT A PARTE E NON UNA ROTTA /api/utility. Le migrazioni
+ * esposte via HTTP in questo progetto erano un rischio noto — endpoint
+ * raggiungibile da chiunque avesse un token valido, non solo da chi
+ * amministra il server — e sono state tolte anche loro (vedi
+ * scripts/migrateTravelParticipants.ts, scripts/migrateImagesToS3.ts).
+ * Questo script si connette a Mongo per conto suo e va lanciato a mano, una
+ * volta, da chi ha accesso al server/al .env.
  *
  * Idempotente: chi ha già un hash bcrypt (prefisso "$2a$"/"$2b$"/"$2y$")
  * viene saltato, quindi si può rilanciare senza rischio se si interrompe a

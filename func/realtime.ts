@@ -2,6 +2,7 @@ import { ObjectId } from "mongodb";
 import { DB_NAME, mongoConnection, getIo } from "../server";
 import { TravelDocument } from "../types/travel";
 import { travelRoom, userRoom, TRAVEL_EVENTS, USER_EVENTS } from "../types/realtime";
+import { parseObjectId } from "../util/mongoIds";
 
 /**
  * Punto unico di uscita degli eventi realtime.
@@ -74,12 +75,8 @@ export function emitToTravelParticipants(
 ): void {
     if (!travelId) return;
 
-    let id: ObjectId;
-    try {
-        id = new ObjectId(travelId);
-    } catch {
-        return;
-    }
+    const id = parseObjectId(travelId);
+    if (!id) return;
 
     travelsCollection()
         .findOne({ _id: id }, { projection: { participants: 1 } })
@@ -142,12 +139,8 @@ export function invalidateMembership(userId: ObjectId | string | undefined | nul
 /** Svuota la cache di appartenenza di tutti i partecipanti di un viaggio. */
 export function invalidateTravelMembership(travelId: ObjectId | string | undefined | null): void {
     if (!travelId) return;
-    let id: ObjectId;
-    try {
-        id = new ObjectId(travelId);
-    } catch {
-        return;
-    }
+    const id = parseObjectId(travelId);
+    if (!id) return;
     travelsCollection()
         .findOne({ _id: id }, { projection: { participants: 1 } })
         .then((travel) => {
@@ -164,12 +157,8 @@ async function travelIdsOf(userId: string): Promise<Set<string>> {
     const cached = membershipCache.get(userId);
     if (cached && cached.expiresAt > Date.now()) return cached.ids;
 
-    let objectId: ObjectId;
-    try {
-        objectId = new ObjectId(userId);
-    } catch {
-        return new Set();
-    }
+    const objectId = parseObjectId(userId);
+    if (!objectId) return new Set();
 
     const travels = await travelsCollection()
         .find({ participants: { $elemMatch: { userid: objectId } } }, { projection: { _id: 1 } })

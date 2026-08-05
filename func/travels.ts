@@ -23,6 +23,8 @@ import { emitToTravel, emitToUser, invalidateMembership, isTravelParticipant } f
 import { TRAVEL_EVENTS, USER_EVENTS } from "../types/realtime";
 import { isSelf } from "./socketAuth";
 import { contentTypeFromExtension, deleteStoredImage, uploadBuffer } from "../util/s3";
+import { validateImageUpload } from "../util/imageValidation";
+import { parseObjectId } from "../util/mongoIds";
 
 // =====================================================================================
 // Constants
@@ -303,6 +305,16 @@ export async function createTravel(req: Request, res: Response, cache: Cache) {
         return;
     }
 
+    // Costruito prima del `try` sottostante, dentro una funzione `async`: un
+    // `new ObjectId` diretto qui sfuggirebbe al try/catch (il throw avviene
+    // nella parte sincrona della funzione, ma Express non fa await su questa
+    // chiamata) e diventerebbe una unhandled rejection. Si valida prima.
+    const participantIds: (ObjectId | null)[] = body.participants.map((p) => parseObjectId(p.userid));
+    if (participantIds.some((id) => id === null)) {
+        res.status(400).send("Id partecipante non valido");
+        return;
+    }
+
     const travel: Omit<TravelDocument, "_id"> = {
         ...body,
         creation_date: new Date(body.creation_date),
@@ -312,9 +324,9 @@ export async function createTravel(req: Request, res: Response, cache: Cache) {
         destination: (body.destination || "").trim(),
         startDate: toDateOrNull(body.startDate),
         endDate: toDateOrNull(body.endDate),
-        participants: body.participants.map((participant): TravelParticipant => ({
+        participants: body.participants.map((participant, index): TravelParticipant => ({
             ...participant,
-            userid: new ObjectId(participant.userid),
+            userid: participantIds[index] as ObjectId,
             // Il viaggio è appena nato, quindi non c'è ancora storia da
             // nascondere: partire da "già visto ora" invece che da "mai
             // visto" evita che il primo post pubblicato prima che qualcuno
@@ -337,6 +349,13 @@ export async function createTravel(req: Request, res: Response, cache: Cache) {
 export async function updateTravel(req: Request, res: Response, cache: Cache, next: NextFunction) {
     const { id, param, userid }: UpdateTravelBody = req.body;
 
+    const travelId = parseObjectId(id);
+    if (!travelId) {
+        res.status(400).send("Id non valido");
+        next();
+        return;
+    }
+
     // Nome, descrizione e budget arrivano sempre; gli altri campi solo dai
     // client che li gestiscono (es. "Modifica viaggio", "imposta le date"
     // dell'itinerario), quindi vanno aggiornati solo quando presenti per non
@@ -358,7 +377,7 @@ export async function updateTravel(req: Request, res: Response, cache: Cache, ne
         // qualunque richiesta con l'id giusto passava, chiunque ne fosse
         // l'autore reale.
         const existing = await travelsCollection().findOne(
-            { _id: new ObjectId(id) },
+            { _id: travelId },
             { projection: { image: 1, participants: 1 } }
         );
         if (!existing) {
@@ -380,7 +399,7 @@ export async function updateTravel(req: Request, res: Response, cache: Cache, ne
         const previousImage: string | undefined = param.image !== undefined ? existing.image : undefined;
 
         const result = await travelsCollection().updateOne(
-            { _id: new ObjectId(id) },
+            { _id: travelId },
             // Cast necessario: i campi opzionali rendono "fields" un record generico.
             { $set: fields } as never
         );
@@ -390,7 +409,7 @@ export async function updateTravel(req: Request, res: Response, cache: Cache, ne
         }
 
         const updated = await travelsCollection().findOne(
-            { _id: new ObjectId(id) },
+            { _id: travelId },
             { projection: { participants: 1 } }
         );
         if (updated) invalidateTravelCaches(cache, id, updated.participants);
@@ -419,10 +438,17 @@ export async function updateTravel(req: Request, res: Response, cache: Cache, ne
 export async function closeTravel(req: Request, res: Response, cache: Cache, next: NextFunction) {
     const { id, userid }: CloseTravelBody = req.body;
 
+    const travelId = parseObjectId(id);
+    if (!travelId) {
+        res.status(400).send("Id non valido");
+        next();
+        return;
+    }
+
     try {
         // Stessa regola di updateTravel: solo il creatore può chiudere il viaggio.
         const existing = await travelsCollection().findOne(
-            { _id: new ObjectId(id) },
+            { _id: travelId },
             { projection: { participants: 1 } }
         );
         if (!existing) {
@@ -439,11 +465,11 @@ export async function closeTravel(req: Request, res: Response, cache: Cache, nex
             return;
         }
 
-        const result = await travelsCollection().updateOne({ _id: new ObjectId(id) }, { $set: { closed: true } });
+        const result = await travelsCollection().updateOne({ _id: travelId }, { $set: { closed: true } });
         // Chiuso = escluso dalla lista "viaggi aperti" (joinedTravelsPipeline
         // filtra closed:false): senza invalidare, resta visibile fino a scadenza cache.
         const updated = await travelsCollection().findOne(
-            { _id: new ObjectId(id) },
+            { _id: travelId },
             { projection: { participants: 1 } }
         );
         if (updated) invalidateTravelCaches(cache, id, updated.participants);
@@ -468,9 +494,16 @@ export async function closeTravel(req: Request, res: Response, cache: Cache, nex
 export async function deleteTravel(req: Request, res: Response, cache: Cache, next: NextFunction) {
     const { id, userid }: DeleteTravelBody = req.body;
 
+    const travelId = parseObjectId(id);
+    if (!travelId) {
+        res.status(400).send("Id non valido");
+        next();
+        return;
+    }
+
     let travels;
     try {
-        travels = await travelsCollection().find({ _id: new ObjectId(id) }).toArray();
+        travels = await travelsCollection().find({ _id: travelId }).toArray();
     } catch (err) {
         res.status(500).send("Errore esecuzione query 1");
         next();
@@ -499,7 +532,7 @@ export async function deleteTravel(req: Request, res: Response, cache: Cache, ne
     }
 
     try {
-        await travelsCollection().deleteOne({ _id: new ObjectId(id) });
+        await travelsCollection().deleteOne({ _id: travelId });
         // NOTA: "travel" sui post è un ObjectId, ma qui viene confrontato con la
         // stringa "id" così come faceva il codice originale (comportamento preesistente).
         const result = await postsCollection().deleteMany({ travel: id } as any);
@@ -639,9 +672,17 @@ export async function setPersonalBudget(req: Request, res: Response, cache: Cach
         return;
     }
 
+    const travelObjectId = parseObjectId(travelid);
+    const userObjectId = parseObjectId(userid);
+    if (!travelObjectId || !userObjectId) {
+        res.status(400).send("Id non valido");
+        next();
+        return;
+    }
+
     try {
         const result = await travelsCollection().updateOne(
-            { _id: new ObjectId(travelid), "participants.userid": new ObjectId(userid) },
+            { _id: travelObjectId, "participants.userid": userObjectId },
             { $set: { "participants.$.personalBudget": value } }
         );
 
@@ -687,9 +728,17 @@ export async function markTravelSeen(req: Request, res: Response, cache: Cache, 
         return;
     }
 
+    const travelObjectId = parseObjectId(travelid);
+    const userObjectId = parseObjectId(userid);
+    if (!travelObjectId || !userObjectId) {
+        res.status(400).send("Id non valido");
+        next();
+        return;
+    }
+
     try {
         await travelsCollection().updateOne(
-            { _id: new ObjectId(travelid), "participants.userid": new ObjectId(userid) },
+            { _id: travelObjectId, "participants.userid": userObjectId },
             { $set: { "participants.$.lastSeenAt": new Date() } }
         );
 
@@ -718,9 +767,16 @@ export async function leaveTravel(req: Request, res: Response, cache: Cache, nex
     // l'id di un viaggio poteva rimuoverne un partecipante a piacere.
     const userid = req.auth?.userId as string;
 
+    const travelObjectId = parseObjectId(travelId);
+    if (!travelObjectId) {
+        res.status(400).send("Id non valido");
+        next();
+        return;
+    }
+
     let travel;
     try {
-        travel = await travelsCollection().findOne({ _id: new ObjectId(travelId) });
+        travel = await travelsCollection().findOne({ _id: travelObjectId });
     } catch (err) {
         res.status(500).send("Errore esecuzione query 1");
         next();
@@ -729,7 +785,7 @@ export async function leaveTravel(req: Request, res: Response, cache: Cache, nex
 
     try {
         if (travel.participants.length === 1) {
-            await travelsCollection().deleteOne({ _id: new ObjectId(travelId) });
+            await travelsCollection().deleteOne({ _id: travelObjectId });
             // NOTA: stesso disallineamento string/ObjectId preesistente descritto in deleteTravel.
             const result = await postsCollection().deleteMany({ travel: travelId } as any);
             invalidateTravelCaches(cache, travelId, travel.participants);
@@ -738,7 +794,7 @@ export async function leaveTravel(req: Request, res: Response, cache: Cache, nex
         } else {
             const remainingParticipants = travel.participants.filter((p) => p.userid.toString() != userid);
             const result = await travelsCollection().updateOne(
-                { _id: new ObjectId(travelId) },
+                { _id: travelObjectId },
                 { $set: { participants: remainingParticipants } }
             );
             // Invalida sia per chi resta (partecipanti cambiati) sia per chi è uscito
@@ -862,10 +918,20 @@ export async function takeTravelByCreator(req: Request, res: Response, cache: Ca
 /** Carica l'immagine (base64) inviata dal client su S3 e restituisce l'URL pubblico dell'oggetto. */
 export async function uploadImage(req: Request, res: Response, next: NextFunction) {
     const { img, imgName }: UploadTravelImageBody = req.body;
-    const newName = Math.random().toString(36).substring(2, 20) + Math.random().toString(36).substring(2, 20);
-    const ext = imgName.split(".").pop() ?? "";
-    const fileName = `${newName}.${ext}`;
     const buffer = Buffer.from(img.replace(/^data:image\/\w+;base64,/, ""), "base64");
+
+    // Whitelist sull'estensione + verifica dei magic bytes: vedi
+    // util/imageValidation.ts sul perché servono entrambe.
+    const validation = validateImageUpload(imgName, buffer);
+    if (!validation.ok) {
+        res.status(400).send(validation.reason);
+        next();
+        return;
+    }
+
+    const newName = Math.random().toString(36).substring(2, 20) + Math.random().toString(36).substring(2, 20);
+    const ext = imgName.split(".").pop()!.toLowerCase();
+    const fileName = `${newName}.${ext}`;
 
     try {
         const url = await uploadBuffer(IMAGE_S3_PREFIX + fileName, buffer, contentTypeFromExtension(ext));

@@ -34,10 +34,16 @@ export const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 /**
  * Segreto di firma. In produzione DEVE arrivare dall'ambiente: un segreto
  * generato a runtime cambia a ogni riavvio (e differisce tra le istanze di
- * un eventuale deploy multi-processo), invalidando tutti i token emessi.
- * Il fallback casuale esiste solo perché il server non deve rifiutarsi di
- * partire in locale se manca il .env — il client sa già rinnovare il token
- * quando l'handshake viene rifiutato.
+ * un eventuale deploy multi-processo), invalidando tutti i token emessi —
+ * sia quelli del canale realtime sia, da quando esiste requireAuth, quelli
+ * di ogni rotta REST autenticata. Il fallback casuale resta accettabile
+ * solo fuori produzione: il server non deve rifiutarsi di partire in locale
+ * se manca il .env, e il client sa già rinnovare il token quando l'handshake
+ * viene rifiutato. In produzione invece un segreto che cambia a ogni riavvio
+ * è un problema silenzioso — nessun errore, solo utenti sloggati di continuo
+ * — quindi lì il processo si rifiuta di partire piuttosto che degradare in
+ * silenzio (vedi env.ts sul perché SOCKET_SECRET viene letto correttamente
+ * dal .env solo se quel modulo resta il primo import di server.ts).
  */
 let secret: Buffer = resolveSecret();
 
@@ -46,6 +52,14 @@ function resolveSecret(): Buffer {
     if (fromEnv && fromEnv.length >= 16) {
         return Buffer.from(fromEnv, "utf8");
     }
+
+    if (process.env.NODE_ENV === "production") {
+        throw new Error(
+            "SOCKET_SECRET assente o troppo corto (min 16 caratteri) in produzione: " +
+            "il server non parte. Impostalo nelle variabili d'ambiente del deploy (o nel .env)."
+        );
+    }
+
     console.log(
         "[socketAuth] SOCKET_SECRET assente o troppo corto (min 16 caratteri): " +
         "uso un segreto casuale valido solo per questo processo. " +

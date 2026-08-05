@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { Request, Response, NextFunction } from "express";
 import { DB_NAME, mongoConnection } from "../server";
 import { emitToUser as emitToUserRoom } from "./realtime";
+import { parseObjectId } from "../util/mongoIds";
 import { Cache } from "../types/common";
 import { UserDocument } from "../types/user";
 import { TravelDocument } from "../types/travel";
@@ -62,14 +63,12 @@ function followCollection() {
     return mongoConnection.db(DB_NAME).collection<FollowDocument>("follow");
 }
 
+// Era una copia locale della stessa logica non-throwing: consolidata su
+// util/mongoIds.ts (unica differenza: quella condivisa è più stretta, non
+// accetta più le stringhe "grezze" da 12 byte, mai un caso voluto qui).
 function toObjectId(value: ObjectId | string | null | undefined): ObjectId | null {
     if (!value) return null;
-    if (value instanceof ObjectId) return value;
-    try {
-        return new ObjectId(value);
-    } catch {
-        return null;
-    }
+    return parseObjectId(value);
 }
 
 // =====================================================================================

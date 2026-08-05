@@ -11,6 +11,7 @@ import { notify } from "./notifications";
 import { emitMoneyChanged, emitToTravel } from "./realtime";
 import { TRAVEL_EVENTS } from "../types/realtime";
 import { isSelf } from "./socketAuth";
+import { parseObjectId, parseObjectIds } from "../util/mongoIds";
 
 /*
 
@@ -55,12 +56,8 @@ function userCollection() {
 export function invalidateMoneyCache(cache: Cache, travelId: ObjectId | string | undefined) {
     if (!travelId) return;
 
-    let id: ObjectId;
-    try {
-        id = new ObjectId(travelId);
-    } catch (ex) {
-        return;
-    }
+    const id = parseObjectId(travelId);
+    if (!id) return;
 
     travelsCollection()
         .findOne({ _id: id }, { projection: { participants: 1 } })
@@ -116,10 +113,8 @@ export async function takeMoneyOverview(req: Request, res: Response, cache: Cach
         return;
     }
 
-    let userObjectId: ObjectId;
-    try {
-        userObjectId = new ObjectId(userid);
-    } catch (ex) {
+    const userObjectId = parseObjectId(userid);
+    if (!userObjectId) {
         res.status(400).send("Parametro userid non valido");
         next();
         return;
@@ -172,14 +167,8 @@ export async function takeMoneyOverview(req: Request, res: Response, cache: Cach
 
 
 async function usersById(ids: string[]): Promise<Map<string, PersonInfo>> {
-    const objectIds: ObjectId[] = [];
-    for (const id of ids) {
-        try {
-            objectIds.push(new ObjectId(id));
-        } catch (ex) {
-            /* id non valido (dato legacy): semplicemente non verrà risolto */
-        }
-    }
+    // Id non validi (dato legacy) vengono semplicemente ignorati, non risolti.
+    const objectIds = parseObjectIds(ids);
 
     const map = new Map<string, PersonInfo>();
     if (objectIds.length === 0) return map;
@@ -232,10 +221,8 @@ export async function settleUp(req: Request, res: Response, cache: Cache, next: 
         return;
     }
 
-    let creatorObjectId: ObjectId;
-    try {
-        creatorObjectId = new ObjectId(userid);
-    } catch (ex) {
+    const creatorObjectId = parseObjectId(userid);
+    if (!creatorObjectId) {
         res.status(400).send("Parametro userid non valido");
         next();
         return;
@@ -248,13 +235,13 @@ export async function settleUp(req: Request, res: Response, cache: Cache, next: 
     };
 
     if (travelid) {
-        try {
-            filter.travel = new ObjectId(travelid);
-        } catch (ex) {
+        const travelObjectId = parseObjectId(travelid);
+        if (!travelObjectId) {
             res.status(400).send("Parametro travelid non valido");
             next();
             return;
         }
+        filter.travel = travelObjectId;
     }
 
     try {

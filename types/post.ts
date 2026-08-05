@@ -54,7 +54,7 @@ export interface ImagesPost extends PostBase {
      * URL pubblici S3 delle immagini (vedi util/s3.ts e func/post.ts#addPostImage).
      * Nei post creati prima della migrazione a S3 può ancora contenere il
      * vecchio nome file locale, servito da ./static/userImage/posts/, finché
-     * non viene aggiornato da migrateImagesToS3 (func/utility.ts).
+     * non viene aggiornato da migrateImagesToS3 (scripts/migrateImagesToS3.ts).
      */
     source: string[];
     description: string;

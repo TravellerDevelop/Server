@@ -1,4 +1,3 @@
-import { ObjectId } from "mongodb";
 import { Request, Response } from "express";
 import { DB_NAME, mongoConnection } from "../server";
 import { Cache } from "../types/common";
@@ -6,6 +5,7 @@ import { FollowDocument, FollowPairBody } from "../types/follow";
 import { UserDocument } from "../types/user";
 import { notify } from "./notifications";
 import { isSelf } from "./socketAuth";
+import { parseObjectIds } from "../util/mongoIds";
 
 function followCollection() {
     return mongoConnection.db(DB_NAME).collection<FollowDocument>("follow");
@@ -183,7 +183,7 @@ export function takeFollowingsWithInfo(req: Request, res: Response, cache: Cache
                 res.status(500).send("Errore esecuzione query 1");
             }
             else {
-                const aus: ObjectId[] = data.map((item) => new ObjectId(item.to));
+                const aus = parseObjectIds(data.map((item) => item.to));
                 userCollection().find({ _id: { $in: aus } }).toArray((err, data) => {
                     if (err) {
                         res.status(500).send("Errore esecuzione query 2");

@@ -17,6 +17,7 @@ import {
 import { TravelDocument } from "../types/travel";
 import { isSelf, issueSocketToken } from "./socketAuth";
 import { hashPassword, verifyPassword } from "./passwordHash";
+import { parseObjectId, parseObjectIds } from "../util/mongoIds";
 
 function userCollection() {
     return mongoConnection.db(DB_NAME).collection<UserDocument>("user");
@@ -74,7 +75,13 @@ export function takeUserById(req: Request, res: Response, cache: Cache, next: Ne
         next();
     }
     else if (id) {
-        userCollection().find({ _id: new ObjectId(id) }).toArray(function (err, data) {
+        const objectId = parseObjectId(id);
+        if (!objectId) {
+            res.status(400).send("Id non valido");
+            next();
+            return;
+        }
+        userCollection().find({ _id: objectId }).toArray(function (err, data) {
             if (err) {
                 res.status(500).send("Errore esecuzione query");
             } else {
@@ -88,7 +95,9 @@ export function takeUserById(req: Request, res: Response, cache: Cache, next: Ne
 
 export function fromIdToUsername(req: Request, res: Response, cache: Cache, next: NextFunction) {
     const { id }: FromIdToUsernameBody = req.body;
-    const ausId: ObjectId[] = id.map((item) => new ObjectId(item));
+    // Id malformati in mezzo agli altri vengono ignorati, non fanno fallire
+    // l'intera richiesta (stesso criterio di parseObjectIds altrove).
+    const ausId: ObjectId[] = parseObjectIds(id ?? []);
 
     userCollection().find({ _id: { $in: ausId } }).toArray(function (err, data) {
         if (err) {
@@ -185,8 +194,14 @@ export function takeTravelsNum(req: Request, res: Response, cache: Cache, next: 
         next();
     }
     else {
+        const objectId = parseObjectId(userid);
+        if (!objectId) {
+            res.status(400).send("Id non valido");
+            next();
+            return;
+        }
         travelsCollection()
-            .countDocuments({ "participants": { "$elemMatch": { "userid": new ObjectId(userid), "creator": true } } })
+            .countDocuments({ "participants": { "$elemMatch": { "userid": objectId, "creator": true } } })
             .then(function (count) {
                 const response: TakeTravelsNumResponse = { count };
                 cache.set("travelsNum-id=" + userid, response, 600);
@@ -265,6 +280,24 @@ export function userTravels(req: Request, res: Response, cache: Cache, next: Nex
     });
 }
 
+/**
+ * Esegue l'escape dei metacaratteri regex (".", "*", "+", "?", ecc.) in una
+ * stringa, così può essere inserita in `new RegExp(...)` e cercata alla
+ * lettera invece che interpretata come pattern.
+ *
+ * Perché serve: `searchUser` costruiva `new RegExp(username, 'i')`
+ * direttamente sull'input dell'utente. Un pattern con backtracking
+ * esponenziale (es. "(a+)+$") eseguito su ogni documento della collection
+ * "user" può bloccare l'event loop — un classico ReDoS, raggiungibile da
+ * chiunque sappia chiamare `GET /api/user/search`. Con l'escape la regex
+ * risultante non ha più quantificatori/gruppi annidati da parte
+ * dell'utente: diventa una ricerca letterale case-insensitive, non un
+ * pattern arbitrario.
+ */
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export function searchUser(req: Request, res: Response, cache: Cache, next: NextFunction) {
     const username = req.query.username as string;
     const cachedData = cache.get("usr-search-keys=" + username);
@@ -274,7 +307,7 @@ export function searchUser(req: Request, res: Response, cache: Cache, next: Next
         next();
     }
     else {
-        const regex = new RegExp(username, 'i');
+        const regex = new RegExp(escapeRegExp(username), 'i');
         userCollection()
             .find({ $or: [{ username: { $regex: regex } }, { name: { $regex: regex } }, { surname: { $regex: regex } }] })
             .limit(3)
@@ -314,8 +347,14 @@ export async function setUserNotifToken(req: Request, res: Response, cache: Cach
         return;
     }
 
+    const userId = parseObjectId(body.userid);
+    if (!userId) {
+        res.status(400).send("Id non valido");
+        next();
+        return;
+    }
+
     try {
-        const userId = new ObjectId(body.userid);
         await userCollection().updateOne(
             { _id: userId },
             {
@@ -359,8 +398,14 @@ export async function verifyToken(req: Request, res: Response, cache: Cache, nex
         return;
     }
 
+    const userId = parseObjectId(body.userid);
+    if (!userId) {
+        res.status(400).send("Id non valido");
+        next();
+        return;
+    }
+
     try {
-        const userId = new ObjectId(body.userid);
         const user = await userCollection().findOne({ _id: userId }, { projection: { notifToken: 1 } });
 
         if (!user) {

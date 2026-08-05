@@ -24,6 +24,8 @@ import { invalidateUnseenCache } from "./travels";
 import { TRAVEL_EVENTS } from "../types/realtime";
 import { isSelf } from "./socketAuth";
 import { contentTypeFromExtension, deleteStoredImage, uploadBuffer } from "../util/s3";
+import { validateImageUpload } from "../util/imageValidation";
+import { parseObjectId } from "../util/mongoIds";
 
 /** Cartella legacy: immagini dei post caricate prima della migrazione a S3. */
 const POST_IMAGE_DIR = "./static/userImage/posts/";
@@ -324,6 +326,16 @@ export async function takePosts(req: Request, res: Response, cache: Cache, next:
         next();
     }
     else {
+        const travelObjectId = parseObjectId(travel);
+        if (!travelObjectId) {
+            // In pratica irraggiungibile (isTravelParticipant sopra avrebbe già
+            // rifiutato un id malformato con 403), ma un `new ObjectId` diretto
+            // dentro una funzione async, sfuggito a un guard più a monte,
+            // diventerebbe comunque una unhandled rejection: vedi util/mongoIds.ts.
+            res.status(400).send("Parametro travel non valido");
+            next();
+            return;
+        }
         postsCollection().aggregate<PostWithCreatorData>([
             {
                 $lookup:
@@ -345,7 +357,7 @@ export async function takePosts(req: Request, res: Response, cache: Cache, next:
             {
                 $match:
                 {
-                    "travel": new ObjectId(travel)
+                    "travel": travelObjectId
                 }
             }
         ])
@@ -355,7 +367,13 @@ export async function takePosts(req: Request, res: Response, cache: Cache, next:
                 cache.set("travel-post=" + travel, response)
                 next();
             })
-            .catch((err) => { throw err; });
+            .catch((err) => {
+                // Prima rilanciava dentro il .catch: un throw lì non ha più
+                // nessuno che lo intercetta, quindi diventava un'altra
+                // unhandled rejection invece di una risposta di errore pulita.
+                res.status(500).send("Errore esecuzione query");
+                next();
+            });
     }
 }
 
@@ -368,7 +386,14 @@ export async function updateVote(req: Request, res: Response, cache: Cache, next
         return;
     }
 
-    postsCollection().updateOne({ _id: new ObjectId(id) }, { $set: { votes: vote, updatedAt: new Date() } }, function (err, data) {
+    const postId = parseObjectId(id);
+    if (!postId) {
+        res.status(400).send("Id non valido");
+        next();
+        return;
+    }
+
+    postsCollection().updateOne({ _id: postId }, { $set: { votes: vote, updatedAt: new Date() } }, function (err, data) {
         if (err) {
             res.status(500).send("Errore esecuzione query");
         } else {
@@ -394,7 +419,14 @@ export function takeLastsPostByUsername(req: Request, res: Response, cache: Cach
         return;
     }
 
-    travelsCollection().find({ "participants.userid": new ObjectId(userid) }).toArray(function (err, data) {
+    const userObjectId = parseObjectId(userid);
+    if (!userObjectId) {
+        res.status(400).send("Parametro userid non valido");
+        next();
+        return;
+    }
+
+    travelsCollection().find({ "participants.userid": userObjectId }).toArray(function (err, data) {
         if (err) {
             console.log("Errore esecuzione query");
             res.status(500).send("Errore esecuzione query");
@@ -445,7 +477,11 @@ export function takeLastsPostByUsername(req: Request, res: Response, cache: Cach
                     res.status(200).send([response, otherData]);
                     next();
                 })
-                .catch((err) => { throw err; });
+                .catch((err) => {
+                    console.log("Errore esecuzione query", err);
+                    res.status(500).send("Errore esecuzione query");
+                    next();
+                });
         }
     });
 }
@@ -458,11 +494,18 @@ export function takeLastsPostByUsername(req: Request, res: Response, cache: Cach
 export function updatePayment(req: Request, res: Response, cache: Cache, next: NextFunction) {
     const { id, destinator, travelid }: UpdatePaymentBody = req.body;
 
+    const postId = parseObjectId(id);
+    if (!postId) {
+        res.status(400).send("Id non valido");
+        next();
+        return;
+    }
+
     // Il travel id serve per invalidare "travel-post=": i client storici non
     // sempre lo mandano, e senza si finiva a cancellare la chiave
     // "travel-post=undefined" lasciando il feed del viaggio con i dati vecchi.
     // Quando manca lo si rilegge dal post stesso.
-    postsCollection().findOne({ _id: new ObjectId(id) }, function (findErr, post) {
+    postsCollection().findOne({ _id: postId }, function (findErr, post) {
         if (findErr) {
             res.status(500).send("Errore esecuzione query");
             next();
@@ -480,7 +523,7 @@ export function updatePayment(req: Request, res: Response, cache: Cache, next: N
 
         const travel = travelid || post?.travel?.toString();
 
-        postsCollection().updateOne({ _id: new ObjectId(id) }, { $set: { destinator, updatedAt: new Date() } } as any, function (err, data) {
+        postsCollection().updateOne({ _id: postId }, { $set: { destinator, updatedAt: new Date() } } as any, function (err, data) {
             if (err) {
                 res.status(500).send("Errore esecuzione query");
             } else {
@@ -545,7 +588,17 @@ export async function updatePinPost(req: Request, res: Response, cache: Cache, n
         return;
     }
 
-    postsCollection().updateOne({ _id: new ObjectId(param._id) }, { $set: { "pinned": param.pinned } }, function (err, data) {
+    const postId = parseObjectId(param._id);
+    if (!postId) {
+        // Qui siamo dopo un `await`: un `new ObjectId` diretto e non protetto
+        // diventerebbe una unhandled rejection invece di questo 400 (vedi
+        // util/mongoIds.ts).
+        res.status(400).send("Id non valido");
+        next();
+        return;
+    }
+
+    postsCollection().updateOne({ _id: postId }, { $set: { "pinned": param.pinned } }, function (err, data) {
         if (err) {
             res.status(500).send("Errore esecuzione query");
         } else {
@@ -573,7 +626,14 @@ export async function updatePinPost(req: Request, res: Response, cache: Cache, n
 export function deletePost(req: Request, res: Response, cache: Cache, next: NextFunction) {
     const { id, travel }: DeletePostBody = req.body;
 
-    postsCollection().findOne({ _id: new ObjectId(id) }, function (err, post) {
+    const postId = parseObjectId(id);
+    if (!postId) {
+        res.status(400).send("Id non valido");
+        next();
+        return;
+    }
+
+    postsCollection().findOne({ _id: postId }, function (err, post) {
         if (err) {
             res.status(500).send("Errore esecuzione query");
             next();
@@ -588,7 +648,7 @@ export function deletePost(req: Request, res: Response, cache: Cache, next: Next
                 }
             }
 
-            postsCollection().deleteOne({ _id: new ObjectId(id) }, function (err, data) {
+            postsCollection().deleteOne({ _id: postId }, function (err, data) {
                 if (err) {
                     res.status(500).send("Errore esecuzione query");
                 } else {
@@ -685,10 +745,8 @@ export function takeTotalToReceive(req: Request, res: Response) {
     // "creator" è salvato come ObjectId (vedi createPost): confrontarlo con lo
     // username, come faceva la versione precedente, non restituiva mai nulla e
     // il totale "Da ricevere" risultava sempre 0.
-    let creator: ObjectId;
-    try {
-        creator = new ObjectId(userid);
-    } catch (ex) {
+    const creator = parseObjectId(userid);
+    if (!creator) {
         res.status(400).send("Parametro userid non valido");
         return;
     }
@@ -730,10 +788,8 @@ export function takeTotalPayedByTravel(req: Request, res: Response) {
     // "travel" è salvato come ObjectId (vedi createPost): con la stringa il
     // filtro non corrispondeva a nessun documento e il budget mostrava sempre
     // "€ 0.00 speso".
-    let travel: ObjectId;
-    try {
-        travel = new ObjectId(travelId);
-    } catch (ex) {
+    const travel = parseObjectId(travelId);
+    if (!travel) {
         res.status(400).send("Parametro travel non valido");
         return;
     }
@@ -806,13 +862,19 @@ export function takePayedGroupByTravel(req: Request, res: Response) {
 export async function addPostImage(req: Request, res: Response) {
     const { img, name: imgName }: AddPostImageBody = req.body;
 
-    const newName = Math.random().toString(36).substring(2, 20) + Math.random().toString(36).substring(2, 20) + Math.random().toString(36).substring(2, 20);
-
-    const aus = imgName.split(".");
-    const ext = aus[aus.length - 1];
-
     const imgData = img.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(imgData, "base64");
+
+    // Whitelist sull'estensione + verifica dei magic bytes: vedi
+    // util/imageValidation.ts sul perché servono entrambe.
+    const validation = validateImageUpload(imgName, buffer);
+    if (!validation.ok) {
+        res.status(400).send(validation.reason);
+        return;
+    }
+
+    const newName = Math.random().toString(36).substring(2, 20) + Math.random().toString(36).substring(2, 20) + Math.random().toString(36).substring(2, 20);
+    const ext = imgName.split(".").pop()!.toLowerCase();
 
     try {
         const url = await uploadBuffer(POST_IMAGE_S3_PREFIX + newName + "." + ext, buffer, contentTypeFromExtension(ext));
@@ -826,9 +888,15 @@ export async function addPostImage(req: Request, res: Response) {
 export function updateToDo(req: Request, res: Response, cache: Cache) {
     const { id, items }: UpdateToDoBody = req.body;
 
+    const postId = parseObjectId(id);
+    if (!postId) {
+        res.status(400).send("Id non valido");
+        return;
+    }
+
     // Il body non porta il travel id: va letto dal post stesso per poter
     // invalidare la cache "travel-post=" corretta (vedi takePosts).
-    postsCollection().findOne({ _id: new ObjectId(id) }, async function (findErr, post) {
+    postsCollection().findOne({ _id: postId }, async function (findErr, post) {
         if (findErr) {
             res.status(500).send("Errore aggiornamento item");
             return;
@@ -840,7 +908,7 @@ export function updateToDo(req: Request, res: Response, cache: Cache) {
             return;
         }
 
-        postsCollection().updateOne({ _id: new ObjectId(id) }, { $set: { items, updatedAt: new Date() } } as any, function (err, data) {
+        postsCollection().updateOne({ _id: postId }, { $set: { items, updatedAt: new Date() } } as any, function (err, data) {
             if (err) {
                 res.status(500).send("Errore aggiornamento item");
             }

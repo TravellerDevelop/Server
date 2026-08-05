@@ -1,9 +1,11 @@
 "use strict";
 
+// Deve restare il primo import del file: vedi env.ts sul perché.
+import "./env";
+
 import http from "http";
 import url from "url";
 import { MongoClient } from "mongodb";
-import dotenv from "dotenv";
 import express, { NextFunction, Request, Response } from "express"; // @types/express
 import cors from "cors"; // @types/cors
 import { Server, Socket } from "socket.io";
@@ -21,17 +23,48 @@ import { createTicket, deleteTicket, shareTicket, takeTickets } from "./func/tic
 import { lookupFlight } from "./func/flights";
 import { deleteNotification, markNotificationsRead, removeUserNotifToken, takeNotificationPreferences, takeNotifications, takeUnreadCount, updateNotificationPreferences } from "./func/notifications";
 import { assignStop, createStop, deleteStop, duplicateItinerary, reorderStops, searchPlace, shiftDay, takeItinerary, takeRecap, updateItineraryMode, updateStop, updateStopChecklist, updateStopStatus, voteStop } from "./func/itinerary";
-import { migrateImagesToS3, migrateTravelParticipants } from "./func/utility";
 import { requireAuth, verifySocketToken } from "./func/socketAuth";
 import { isTravelParticipant } from "./func/realtime";
 import { CLIENT_EVENTS, travelRoom, userRoom } from "./types/realtime";
-
-dotenv.config({ path: ".env" });
+import { createRateLimiter } from "./util/rateLimit";
 
 const app = express();
 const httpServer = http.createServer(app);
 const io = new Server(httpServer);
 const PORT: string | number = process.env.PORT || 1337;
+
+/**
+ * Rete di sicurezza a livello di processo.
+ *
+ * Express 4 intercetta da sé un `throw` sincrono dentro un handler e lo
+ * trasforma in una risposta di errore, ma NON intercetta una promise
+ * rifiutata e non gestita dentro un handler `async` senza `try/catch` — e
+ * questo codebase ne ha parecchi, spesso proprio intorno a `new ObjectId(x)`
+ * su un valore che arriva da fuori (vedi util/mongoIds.ts). Senza questo
+ * handler, un id malformato mandato da chiunque diventa un
+ * "unhandledRejection" che nelle versioni recenti di Node termina il
+ * processo: un DoS gratuito, zero autenticazione richiesta.
+ *
+ * Questo NON sostituisce il fix vero (usare parseObjectId invece di
+ * `new ObjectId` diretto nei singoli handler) — è il backstop per i punti
+ * non ancora convertiti o per qualunque altra eccezione async imprevista:
+ * logga e mantiene il processo in vita, invece di farlo cadere.
+ */
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason);
+});
+
+/**
+ * Un'eccezione sincrona sfuggita a Express (fuori da un handler di rotta,
+ * es. in un callback/timer) lascia il processo in uno stato non garantito:
+ * qui logghiamo e usciamo, lasciando che sia nodemon/il process manager a
+ * far ripartire il servizio pulito, invece di continuare a girare in uno
+ * stato potenzialmente corrotto.
+ */
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err);
+  process.exit(1);
+});
 
 /** Client mongo condiviso, valorizzato al termine della connessione iniziale (vedi startConnection). */
 export let mongoConnection: MongoClient;
@@ -49,7 +82,22 @@ export function getIo(): Server {
 const cache = new NodeCache({ stdTTL: 0, checkperiod: 120 });
 export const DB_NAME = "traveller";
 const connectionString: string = process.env.connectionString;
-export const ISDEBUG = true;
+
+/**
+ * Prima era `true` cablato nel codice: un interruttore manuale da ricordarsi
+ * di rimettere a `false` prima di ogni release (vedi release.test.ts, che
+ * infatti lo controllava). Un interruttore manuale è esattamente il tipo di
+ * cosa che ci si dimentica di girare — motivo per cui è finito nella
+ * security review di questo progetto. Derivarlo da NODE_ENV lo rende
+ * automatico: gli host Node più comuni impostano NODE_ENV=production da
+ * soli per i servizi web (compreso quello su cui gira questo servizio, vedi
+ * NOMINATIM_UA in func/itinerary.ts), quindi non serve più nessun intervento
+ * manuale al deploy — e nemmeno nessuno che se lo dimentichi.
+ */
+export function computeIsDebug(nodeEnv: string | undefined): boolean {
+  return nodeEnv !== "production";
+}
+export const ISDEBUG = computeIsDebug(process.env.NODE_ENV);
 
 //CREAZIONE E AVVIO DEL SERVER HTTP
 let paginaErrore: string = "";
@@ -84,14 +132,69 @@ app.use("/", (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+/**
+ * Nessun deploy dietro proxy inversa (Render, vedi NOMINATIM_UA in
+ * func/itinerary.ts) mette l'IP reale del client in `req.ip` di sua
+ * iniziativa: senza dirlo esplicitamente a Express, ogni richiesta risulta
+ * arrivare dall'IP del proxy, e con esso il rate limiting qui sotto
+ * finirebbe per contare TUTTI gli utenti in un unico contatore condiviso.
+ * "1" = ci si fida di un solo hop di proxy davanti al processo Node.
+ */
+app.set("trust proxy", 1);
+
+/**
+ * Nessun client web chiama questa API dal browser (solo l'app mobile, che
+ * non manda l'header Origin, e quindi non è mai soggetta a CORS): qualunque
+ * richiesta CON un Origin diverso da localhost è quindi per definizione un
+ * sito di terzi che prova a usare, dal browser di un utente già loggato in
+ * un'altra scheda, i cookie/credenziali di questa sessione. Prima
+ * riflettevamo qualsiasi origin (`callback(null, true)` incondizionato):
+ * equivaleva a nessuna protezione.
+ */
+const ALLOWED_CORS_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
 app.use("/", cors({
   origin: function (origin, callback) {
-    return callback(null, true);
+    // Nessun header Origin: non è una richiesta browser cross-origin (app
+    // mobile, curl, chiamate server-to-server, Postman...). CORS riguarda
+    // solo i browser, quindi qui non c'è nulla da restringere.
+    if (!origin || ALLOWED_CORS_ORIGIN.test(origin)) {
+      callback(null, true);
+      return;
+    }
+    // `callback(null, false)` invece di `callback(new Error(...))`: niente
+    // header Access-Control-Allow-Origin nella risposta, che il browser del
+    // chiamante rifiuta da sé — senza far scattare il middleware di errore
+    // globale con un generico 500.
+    callback(null, false);
   },
   credentials: true,
 }));
 
 app.set("json spaces", 4);
+
+/**
+ * Rate limiting generale su /api/*: senza, niente in questo server impedisce
+ * a un singolo IP di martellare qualunque endpoint (letture comprese) senza
+ * limite. Le rotte più sensibili al brute-force (login, registrazione,
+ * verifyToken) hanno in più un limite più stretto, applicato direttamente
+ * sulla loro route qui sotto. Vedi util/rateLimit.ts sul perché non usa
+ * `express-rate-limit` e sul limite noto (contatori in memoria, non
+ * condivisi tra istanze).
+ */
+const apiRateLimiter = createRateLimiter({
+  windowMs: 5 * 60 * 1000,
+  max: 600,
+  message: "Troppe richieste da questo indirizzo, riprova tra qualche minuto",
+});
+app.use("/api/", apiRateLimiter);
+
+/** Limite più stretto per le rotte legate a login/registrazione: qui il costo di un tentativo sbagliato per l'attaccante deve essere alto. */
+const authRateLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 20,
+  message: "Troppi tentativi, riprova tra qualche minuto",
+});
 
 app.use("/api/", function (req: Request, res: Response, next: NextFunction) {
   let safe = true;
@@ -169,13 +272,13 @@ app.get("/api/takeVersion", (req: Request, res: Response, next: NextFunction) =>
 app.get("/api/user/info", (req: Request, res: Response, next: NextFunction) => takeUserInfo(req, res, next)); // UTILIZZARE SOLO PER LA REGISTRAZIONE
 app.get("/api/user/takeUserById", (req: Request, res: Response, next: NextFunction) => takeUserById(req, res, cache, next));
 app.post("/api/user/fromIdToUsernames", function (req: Request, res: Response, next: NextFunction) { fromIdToUsername(req, res, cache, next); });
-app.post("/api/user/register", function (req: Request, res: Response, next: NextFunction) { registerUser(req, res, next); });
+app.post("/api/user/register", authRateLimiter, function (req: Request, res: Response, next: NextFunction) { registerUser(req, res, next); });
 app.get("/api/user/takeTravelsNum", function (req: Request, res: Response, next: NextFunction) { takeTravelsNum(req, res, cache, next); });
-app.post("/api/user/login", function (req: Request, res: Response, next: NextFunction) { login(req, res, cache, next); });
+app.post("/api/user/login", authRateLimiter, function (req: Request, res: Response, next: NextFunction) { login(req, res, cache, next); });
 app.get("/api/user/travels", function (req: Request, res: Response, next: NextFunction) { userTravels(req, res, cache, next); });
 app.get("/api/user/search", function (req: Request, res: Response, next: NextFunction) { searchUser(req, res, cache, next); });
 app.post("/api/user/setNotifToken", function (req: Request, res: Response, next: NextFunction) { setUserNotifToken(req, res, cache, next); });
-app.post("/api/user/verifyToken", function (req: Request, res: Response, next: NextFunction) { verifyToken(req, res, cache, next); });
+app.post("/api/user/verifyToken", authRateLimiter, function (req: Request, res: Response, next: NextFunction) { verifyToken(req, res, cache, next); });
 app.post("/api/user/removeNotifToken", function (req: Request, res: Response, next: NextFunction) { removeUserNotifToken(req, res, cache, next); });
 
 /***********NOTIFICHE****************/
@@ -246,8 +349,12 @@ app.get("/api/itinerary/recap", function (req: Request, res: Response) { takeRec
 app.post("/api/itinerary/duplicate", function (req: Request, res: Response) { duplicateItinerary(req, res, cache); });
 app.get("/api/itinerary/searchPlace", function (req: Request, res: Response) { searchPlace(req, res, cache); });
 
-app.get("/api/utility", (req: Request, res: Response) => { migrateTravelParticipants(req, res); });
-app.get("/api/utility/migrateImagesToS3", (req: Request, res: Response) => { migrateImagesToS3(req, res); });
+// Le migrazioni una tantum (partecipanti dei viaggi, immagini locali -> S3)
+// non sono più esposte via HTTP: erano raggiungibili da chiunque avesse un
+// token valido, non solo da chi amministra il server, e non esiste un
+// concetto di ruolo/admin in questa app per limitarle. Ora sono script a sé,
+// lanciati a mano: vedi scripts/migrateTravelParticipants.ts e
+// scripts/migrateImagesToS3.ts (npm run migrate:travelParticipants / migrate:imagesToS3).
 
 // Gestione ticket
 app.post("/api/tickets/create", function (req: Request, res: Response) { createTicket(req, res, cache); });
@@ -346,7 +453,44 @@ io.on("connection", (socket: Socket) => {
   });
 });
 
-app.use("/api/", function (req: Request, res: Response, next: NextFunction) {
+/**
+ * Middleware di errore Express (4 argomenti: è la firma che Express usa per
+ * riconoscerlo come tale, non un dettaglio stilistico). Prima di questo
+ * commit qui c'era un middleware "/api/" vuoto, senza `next()` e senza `err`
+ * — non faceva nulla e ogni richiesta restava appesa finché non scattava un
+ * timeout. Va registrato per ultimo: Express ci arriva solo se un handler
+ * precedente chiama `next(err)` o lancia sincrono senza gestirlo da sé.
+ *
+ * `paginaErrore` (letta da static/error.html in init()) restava valorizzata
+ * ma inutilizzata: nessuna rotta la mandava mai in risposta. La usiamo qui
+ * solo per le richieste non-API (pagine statiche), mentre /api/* riceve un
+ * JSON coerente con lo stile delle altre rotte REST.
+ */
+app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+  if (res.headersSent) {
+    next(err);
+    return;
+  }
+
+  console.error("[errore]", req.method, req.originalUrl, err);
+
+  const isBadObjectId = err instanceof Error && err.name === "BSONTypeError";
+  const isApiRequest = req.originalUrl.startsWith("/api/");
+
+  if (isBadObjectId) {
+    if (isApiRequest) {
+      res.status(400).send("Parametro id non valido");
+    } else {
+      res.status(400).send(paginaErrore || "Richiesta non valida");
+    }
+    return;
+  }
+
+  if (isApiRequest) {
+    res.status(500).send("Errore esecuzione query");
+  } else {
+    res.status(500).send(paginaErrore || "Errore interno");
+  }
 });
 
 startConnection();

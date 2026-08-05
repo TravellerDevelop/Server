@@ -12,6 +12,7 @@ import { notify } from "./notifications";
 import { emitToUser } from "./realtime";
 import { USER_EVENTS } from "../types/realtime";
 import { isSelf } from "./socketAuth";
+import { parseObjectId } from "../util/mongoIds";
 
 function ticketsCollection() {
     return mongoConnection.db(DB_NAME).collection<TicketDocument>("tickets");
@@ -62,10 +63,15 @@ export function takeTickets(req: Request, res: Response, cache: Cache) {
         cache.set("tickets=" + userid, cachedData, 600);
     }
     else {
+        const creatorId = parseObjectId(userid);
+        if (!creatorId) {
+            res.status(400).send("Id non valido");
+            return;
+        }
         ticketsCollection().aggregate<TicketWithSharedByLookup>([
             {
                 $match: {
-                    creator: new ObjectId(userid)
+                    creator: creatorId
                 }
             },
             {
@@ -107,9 +113,15 @@ export function takeTickets(req: Request, res: Response, cache: Cache) {
 export function deleteTicket(req: Request, res: Response, cache: Cache) {
     const { id }: DeleteTicketBody = req.body;
 
+    const ticketId = parseObjectId(id);
+    if (!ticketId) {
+        res.status(400).send("Id non valido");
+        return;
+    }
+
     // Serve il creatore per invalidare la cache giusta: va letto prima della
     // cancellazione, altrimenti il documento non esiste più.
-    ticketsCollection().findOne({ _id: new ObjectId(id) }, function (findErr, ticket) {
+    ticketsCollection().findOne({ _id: ticketId }, function (findErr, ticket) {
         if (findErr) {
             res.status(500).send("Errore esecuzione query 1");
             return;
@@ -119,7 +131,7 @@ export function deleteTicket(req: Request, res: Response, cache: Cache) {
             return;
         }
 
-        ticketsCollection().deleteOne({ _id: new ObjectId(id) }, function (err, data) {
+        ticketsCollection().deleteOne({ _id: ticketId }, function (err, data) {
             if (err) {
                 res.status(500).send("Errore esecuzione query 1");
             } else {
@@ -138,13 +150,20 @@ export function shareTicket(req: Request, res: Response, cache: Cache) {
     // Chi condivide è sempre chi chiama, non il valore dichiarato nel body.
     const createBy = req.auth?.userId as string;
 
+    const recipientId = parseObjectId(userid);
+    const sharedById = parseObjectId(createBy);
+    if (!recipientId || !sharedById) {
+        res.status(400).send("Id non valido");
+        return;
+    }
+
     // NOTA: a differenza di createTicket, qui "date" non viene convertita esplicitamente
     // in Date: comportamento preesistente preservato (il contenuto condiviso arriva già
     // con i campi del ticket originale).
     const param = {
         ...content,
-        creator: new ObjectId(userid),
-        sharedBy: new ObjectId(createBy),
+        creator: recipientId,
+        sharedBy: sharedById,
     };
 
     ticketsCollection().insertOne(param as unknown as TicketDocument, function (err, data) {

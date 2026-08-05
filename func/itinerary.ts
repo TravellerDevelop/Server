@@ -36,6 +36,7 @@ import {
 import { notifyTravel } from "./notifications";
 import { emitItineraryChanged, emitToTravel } from "./realtime";
 import { TRAVEL_EVENTS } from "../types/realtime";
+import { parseObjectId } from "../util/mongoIds";
 
 /** Etichette leggibili delle modalità di permesso, per il testo delle notifiche. */
 const ITINERARY_MODE_LABELS: Record<string, string> = {
@@ -208,13 +209,11 @@ function describeChanges(before: StopDocument, after: Partial<StopDocument>): st
     return `Aggiornato: ${changes.join(", ")}`;
 }
 
+// Era una copia locale della stessa logica non-throwing: consolidata su
+// util/mongoIds.ts (vedi func/notifications.ts, stessa storia).
 function toObjectId(value?: string | null): ObjectId | null {
     if (!value) return null;
-    try {
-        return new ObjectId(value);
-    } catch {
-        return null;
-    }
+    return parseObjectId(value);
 }
 
 // =====================================================================================
@@ -421,7 +420,13 @@ async function nextOrder(travelId: ObjectId, day: number | null): Promise<number
 /** Itinerario completo di un viaggio: permessi, giorni, idee e tappe. */
 export async function takeItinerary(req: Request, res: Response) {
     const travel = req.query.travel as string;
-    const userid = req.query.userid as string;
+    // L'identità è quella verificata dal token, mai il valore dichiarato in
+    // query: altrimenti sarebbe bastato cambiare "userid" per leggere
+    // l'itinerario con i permessi di un altro partecipante (es. vedersi
+    // "canEdit: true" pur non essendo admin) — loadContext() calcola isAdmin/
+    // isParticipant/canManagePlan proprio a partire da questo valore, quindi
+    // era l'unico punto che contava davvero ai fini dei permessi.
+    const userid = req.auth?.userId as string;
 
     try {
         const ctx = await loadContext(travel, userid);
@@ -468,7 +473,10 @@ export async function takeItinerary(req: Request, res: Response) {
 
 /** Cambia la modalità di collaborazione: solo il creatore del viaggio. */
 export async function updateItineraryMode(req: Request, res: Response) {
-    const { travel, userid, mode }: UpdateItineraryModeBody = req.body;
+    const { travel, mode }: UpdateItineraryModeBody = req.body;
+    // Vedi nota in takeItinerary: qui deciderebbe persino chi può cambiare i
+    // permessi dell'intero itinerario, non solo cosa vede.
+    const userid = req.auth?.userId as string;
 
     if (!ITINERARY_PERMISSION_MODES.includes(mode)) {
         res.status(400).send("Modalità non valida");
@@ -521,7 +529,9 @@ export async function updateItineraryMode(req: Request, res: Response) {
 
 /** Crea un'idea (day assente) o una tappa in un giorno. */
 export async function createStop(req: Request, res: Response, cache?: Cache) {
-    const { travel, userid, param }: CreateStopBody = req.body;
+    const { travel, param }: CreateStopBody = req.body;
+    // Vedi nota in takeItinerary.
+    const userid = req.auth?.userId as string;
 
     if (!param || !String(param.title || "").trim()) {
         res.status(400).send("Il titolo è obbligatorio");
@@ -595,7 +605,10 @@ export async function createStop(req: Request, res: Response, cache?: Cache) {
 
 /** Modifica i campi di una tappa. Solo l'autore o chi può gestire il piano. */
 export async function updateStop(req: Request, res: Response, cache?: Cache) {
-    const { id, userid, param }: UpdateStopBody = req.body;
+    const { id, param }: UpdateStopBody = req.body;
+    // Vedi nota in takeItinerary: qui deciderebbe "sei l'autore/puoi gestire
+    // il piano" al posto della verifica vera.
+    const userid = req.auth?.userId as string;
 
     const stopId = toObjectId(id);
     if (!stopId || !param) {
@@ -679,7 +692,9 @@ export async function updateStop(req: Request, res: Response, cache?: Cache) {
 
 /** Elimina una tappa. Solo l'autore o chi può gestire il piano. */
 export async function deleteStop(req: Request, res: Response, cache?: Cache) {
-    const { id, userid }: DeleteStopBody = req.body;
+    const { id }: DeleteStopBody = req.body;
+    // Vedi nota in takeItinerary.
+    const userid = req.auth?.userId as string;
 
     const stopId = toObjectId(id);
     if (!stopId) {
@@ -733,7 +748,9 @@ export async function deleteStop(req: Request, res: Response, cache?: Cache) {
  * day null riporta la tappa tra le idee senza eliminarla.
  */
 export async function assignStop(req: Request, res: Response, cache?: Cache) {
-    const { id, userid, day, startTime, index }: AssignStopBody = req.body;
+    const { id, day, startTime, index }: AssignStopBody = req.body;
+    // Vedi nota in takeItinerary.
+    const userid = req.auth?.userId as string;
 
     const stopId = toObjectId(id);
     if (!stopId) {
@@ -836,7 +853,9 @@ export async function assignStop(req: Request, res: Response, cache?: Cache) {
 
 /** Riscrive l'ordine di tutte le tappe di un giorno (usato dallo spostamento manuale). */
 export async function reorderStops(req: Request, res: Response) {
-    const { travel, userid, day, order }: ReorderStopsBody = req.body;
+    const { travel, day, order }: ReorderStopsBody = req.body;
+    // Vedi nota in takeItinerary.
+    const userid = req.auth?.userId as string;
 
     if (!Array.isArray(order)) {
         res.status(400).send("Ordine non valido");
@@ -902,7 +921,9 @@ export async function reorderStops(req: Request, res: Response) {
  * cambia il piano e segue le regole di modalità.
  */
 export async function updateStopStatus(req: Request, res: Response, cache?: Cache) {
-    const { id, userid, status }: UpdateStopStatusBody = req.body;
+    const { id, status }: UpdateStopStatusBody = req.body;
+    // Vedi nota in takeItinerary.
+    const userid = req.auth?.userId as string;
 
     const stopId = toObjectId(id);
     if (!stopId || !STOP_STATUSES.includes(status)) {
@@ -968,7 +989,10 @@ export async function updateStopStatus(req: Request, res: Response, cache?: Cach
 
 /** Vota (o ritira il voto su) una proposta. Solo in modalità "proposal". */
 export async function voteStop(req: Request, res: Response) {
-    const { id, userid }: VoteStopBody = req.body;
+    const { id }: VoteStopBody = req.body;
+    // Vedi nota in takeItinerary: senza, chiunque avrebbe potuto votare (o
+    // ritirare il voto) a nome di un altro partecipante.
+    const userid = req.auth?.userId as string;
 
     const stopId = toObjectId(id);
     if (!stopId) {
@@ -1012,7 +1036,9 @@ export async function voteStop(req: Request, res: Response) {
 
 /** Spunta/despunta le voci della checklist di una tappa: aperto a tutti i partecipanti. */
 export async function updateStopChecklist(req: Request, res: Response) {
-    const { id, userid, checklist }: UpdateChecklistBody = req.body;
+    const { id, checklist }: UpdateChecklistBody = req.body;
+    // Vedi nota in takeItinerary.
+    const userid = req.auth?.userId as string;
 
     const stopId = toObjectId(id);
     if (!stopId) {
@@ -1057,7 +1083,9 @@ export async function updateStopChecklist(req: Request, res: Response) {
  * con l'orario reale.
  */
 export async function shiftDay(req: Request, res: Response, cache?: Cache) {
-    const { travel, userid, day, minutes, fromStop }: ShiftDayBody = req.body;
+    const { travel, day, minutes, fromStop }: ShiftDayBody = req.body;
+    // Vedi nota in takeItinerary.
+    const userid = req.auth?.userId as string;
 
     const targetDay = normalizeDay(day);
     const delta = Number(minutes);
@@ -1172,7 +1200,8 @@ function numberToTime(total: number): string {
  */
 export async function takeRecap(req: Request, res: Response) {
     const travel = req.query.travel as string;
-    const userid = req.query.userid as string;
+    // Vedi nota in takeItinerary.
+    const userid = req.auth?.userId as string;
 
     try {
         const ctx = await loadContext(travel, userid);
@@ -1265,7 +1294,10 @@ export async function takeRecap(req: Request, res: Response) {
  * al viaggio in cui sono successi.
  */
 export async function duplicateItinerary(req: Request, res: Response, cache?: Cache) {
-    const { sourceTravel, targetTravel, userid }: DuplicateItineraryBody = req.body;
+    const { sourceTravel, targetTravel }: DuplicateItineraryBody = req.body;
+    // Vedi nota in takeItinerary: qui deciderebbe persino se chi chiama
+    // partecipa davvero ai due viaggi coinvolti.
+    const userid = req.auth?.userId as string;
 
     try {
         const source = await loadContext(sourceTravel, userid);
