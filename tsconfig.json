@@ -99,5 +99,19 @@
     /* Completeness */
     // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
     "skipLibCheck": true                                 /* Skip type checking all .d.ts files. */
+  },
+  /**
+   * Per default ts-node NON carica tutti i file del progetto: aggiunge al
+   * programma solo quelli effettivamente require()ati mentre l'app gira.
+   * types/express.d.ts (l'augmentation di Express.Request con "auth") non
+   * viene importato da nessuno — è pensato per essere globale — quindi senza
+   * questa opzione ts-node non lo vede mai e "req.auth" risulta un errore di
+   * tipo ovunque venga letto/scritto, anche se il file esiste ed è corretto.
+   * "files: true" dice a ts-node di risolvere l'elenco file allo stesso modo
+   * di `tsc` (rispettando "include"/"files" del tsconfig), che di default è
+   * "**\/*" e quindi include anche i .d.ts sciolti come questo.
+   */
+  "ts-node": {
+    "files": true
   }
 }

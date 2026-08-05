@@ -1,0 +1,125 @@
+{
+  "info": {
+    "name": "Traveller API",
+    "description": "Collection minima per testare l'autenticazione REST. Login pubblico salva userId/token nell'environment; lo script a livello di collection li allega come header Authorization/X-User-Id a ogni altra richiesta.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Allega automaticamente le credenziali a ogni richiesta della collection,",
+          "// tranne che serva esplicitamente farlo a mano (es. per testare un 401).",
+          "const token = pm.environment.get('token');",
+          "const userId = pm.environment.get('userId');",
+          "if (token) pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+          "if (userId) pm.request.headers.upsert({ key: 'X-User-Id', value: userId });"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Login (pubblico)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Il server confronta un digest SHA-256 della password, non la password",
+              "// in chiaro (vedi func/user.ts:login). Postman include CryptoJS di serie.",
+              "const digest = CryptoJS.SHA256(pm.environment.get('password') || '').toString();",
+              "pm.environment.set('password_digest', digest);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "  const body = pm.response.json();",
+              "  const user = Array.isArray(body) ? body[0] : null;",
+              "  if (user && user._id && user.socketToken) {",
+              "    pm.environment.set('userId', user._id);",
+              "    pm.environment.set('token', user.socketToken);",
+              "    console.log('Credenziali salvate per', user.username);",
+              "  } else {",
+              "    console.warn('Login riuscito ma risposta senza socketToken:', body);",
+              "  }",
+              "} else {",
+              "  console.warn('Login fallito:', pm.response.code, pm.response.text());",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password_digest}}\"\n}"
+        },
+        "url": { "raw": "{{base_url}}api/user/login", "host": ["{{base_url}}api"], "path": ["user", "login"] }
+      }
+    },
+    {
+      "name": "Take Money Overview (protetto)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}api/post/takeMoneyOverview?userid={{userId}}",
+          "host": ["{{base_url}}api"],
+          "path": ["post", "takeMoneyOverview"],
+          "query": [{ "key": "userid", "value": "{{userId}}" }]
+        }
+      }
+    },
+    {
+      "name": "Take Joined Travels (protetto)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}api/travel/takeJoined?userid={{userId}}",
+          "host": ["{{base_url}}api"],
+          "path": ["travel", "takeJoined"],
+          "query": [{ "key": "userid", "value": "{{userId}}" }]
+        }
+      }
+    },
+    {
+      "name": "Senza token (deve dare 401)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Override locale: rimuove gli header messi dallo script di collection,",
+              "// per verificare che il server rifiuti davvero le richieste senza token.",
+              "pm.request.headers.remove('Authorization');",
+              "pm.request.headers.remove('X-User-Id');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}api/travel/takeJoined?userid={{userId}}",
+          "host": ["{{base_url}}api"],
+          "path": ["travel", "takeJoined"],
+          "query": [{ "key": "userid", "value": "{{userId}}" }]
+        }
+      }
+    }
+  ]
+}
